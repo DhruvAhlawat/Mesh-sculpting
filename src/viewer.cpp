@@ -67,7 +67,14 @@ namespace COL781 {
             return true;
         }
 
-        void Viewer::setMesh(int nv, int nt, int ne, const glm::vec3* vertices, const glm::vec3* normals, const glm::ivec3* triangles, const glm::ivec2* edges) {
+        void Viewer::setMesh(int nv, int nt, int ne, const glm::vec3* vertices, const glm::ivec3* triangles, const glm::ivec2* edges, const glm::vec3* normals) {
+            if(normals == nullptr) {
+                glm::vec3* normalsz = new glm::vec3[nv];
+                for(int i = 0; i < nv; i++) {
+                    normalsz[i] = glm::vec3(0.0, 0.0, 0.0);
+                }
+                normals = normalsz;
+            }
             r.setVertexAttribs(object, 0, nv, vertices);
             r.setVertexAttribs(object, 1, nv, normals);
             r.setTriangleIndices(object, nt, triangles);
@@ -147,10 +154,13 @@ namespace COL781 {
                 r.setUniform(program, "lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
                 r.setupFilledFaces();
-                glm::vec3 orange(1.0f, 0.6f, 0.2f);
+                glm::vec3 red(1.0f, 0.0f, 0.0f);
+                glm::vec3 green(0.0f, 1.0f, 0.0f);
+                glm::vec3 blue(0.0f, 0.0f, 1.0f);
                 glm::vec3 white(1.0f, 1.0f, 1.0f);
-                r.setUniform(program, "ambientColor", 0.4f*orange);
-                r.setUniform(program, "diffuseColor", 0.9f*orange);
+                r.setUniform(program, "ambientColor", 0.5f*white);
+                r.setUniform(program, "intdiffuseColor", 0.8f*red);
+                r.setUniform(program, "extdiffuseColor", 0.8f*blue);
                 r.setUniform(program, "specularColor", 0.8f*white);
                 r.setUniform(program, "phongExponent", 100.f);
                 r.drawObject(object);

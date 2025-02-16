@@ -236,9 +236,9 @@ namespace COL781 {
         }
 
         void Rasterizer::setupWireFrame() {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            glEnable(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-1.f, -1.f);
+            // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            // glEnable(GL_POLYGON_OFFSET_LINE);
+            // glPolygonOffset(10.f, 10.f);
             glLineWidth(2.5f);
         }
 

@@ -36,6 +36,7 @@ namespace COL781 {
             COL781::OpenGL::ShaderProgram program;
             COL781::OpenGL::Object object;
             COL781::OpenGL::Object wireframe;
+            glm::mat4 stagetransform;
             Camera camera;
         };
 

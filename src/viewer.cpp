@@ -67,6 +67,28 @@ namespace COL781 {
             return true;
         }
 
+        glm::mat4 calculateModelMatrix(const glm::vec3* vertices, int nv) {
+            if (nv <= 0) {
+                return glm::mat4(1.0f);
+            }
+            glm::vec3 min = vertices[0];
+            glm::vec3 max = vertices[0];
+            for (int i = 1; i < nv; ++i) {
+                min = glm::min(min, vertices[i]);
+                max = glm::max(max, vertices[i]);
+            }
+            glm::vec3 center = (min + max) * 0.5f;
+            glm::vec3 size = max - min;
+            float max_dimension = glm::max(glm::max(size.x, size.y), size.z);
+            if (max_dimension <= 0.0f) {
+                max_dimension = 1.0f;
+            }
+            float scale_factor = 1.0f / max_dimension;
+            glm::mat4 translation = glm::translate(glm::mat4(1.0f), -center);
+            glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor));
+            return scaling * translation;
+        }
+
         void Viewer::setMesh(int nv, int nt, int ne, const glm::vec3* vertices, const glm::ivec3* triangles, const glm::ivec2* edges, const glm::vec3* normals) {
             if(normals == nullptr) {
                 glm::vec3* normalsz = new glm::vec3[nv];
@@ -81,11 +103,13 @@ namespace COL781 {
             r.setVertexAttribs(wireframe, 0, nv, vertices);
             r.setVertexAttribs(wireframe, 1, nv, normals);
             r.setEdgeIndices(wireframe, ne, edges);
+            stagetransform = calculateModelMatrix(vertices, nv);
         }
 
         void Viewer::view() {
             // The transformation matrix.
-            glm::mat4 model = glm::mat4(1.0f);
+            glm::mat4 model = stagetransform;
+            // glm::mat4 model = glm::mat4(1.0f);
             glm::mat4 view;    
             glm::mat4 projection = camera.getProjectionMatrix();
 
@@ -153,14 +177,14 @@ namespace COL781 {
                 r.setUniform(program, "viewPos", camera.position);
                 r.setUniform(program, "lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-                r.setupFilledFaces();
+                // r.setupFilledFaces();
                 glm::vec3 red(1.0f, 0.0f, 0.0f);
                 glm::vec3 green(0.0f, 1.0f, 0.0f);
                 glm::vec3 blue(0.0f, 0.0f, 1.0f);
                 glm::vec3 white(1.0f, 1.0f, 1.0f);
-                r.setUniform(program, "ambientColor", 0.5f*white);
-                r.setUniform(program, "intdiffuseColor", 0.8f*red);
-                r.setUniform(program, "extdiffuseColor", 0.8f*blue);
+                r.setUniform(program, "ambientColor", 0.25f*white);
+                r.setUniform(program, "intdiffuseColor", 0.75f*red);
+                r.setUniform(program, "extdiffuseColor", 0.75f*blue);
                 r.setUniform(program, "specularColor", 0.8f*white);
                 r.setUniform(program, "phongExponent", 100.f);
                 r.drawObject(object);
@@ -168,7 +192,8 @@ namespace COL781 {
                 r.setupWireFrame();
                 glm::vec3 black(0.0f, 0.0f, 0.0f);
                 r.setUniform(program, "ambientColor", black);
-                r.setUniform(program, "diffuseColor", black);
+                r.setUniform(program, "intdiffuseColor", black);
+                r.setUniform(program, "extdiffuseColor", black);
                 r.setUniform(program, "specularColor", black);
                 r.setUniform(program, "phongExponent", 0.f);
                 r.drawEdges(wireframe);

@@ -220,6 +220,8 @@ namespace COL781 {
         }
 
         void Rasterizer::drawObject(const Object &object) {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(1.f, 1.f);
             glBindVertexArray(object.vao);
             glDrawElements(GL_TRIANGLES, 3*object.nTris, GL_UNSIGNED_INT, 0);
             glCheckError();

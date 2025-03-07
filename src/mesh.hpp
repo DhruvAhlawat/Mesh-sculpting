@@ -18,7 +18,7 @@ class mesh
     //triangulates the mesh for rasterization. 
     void triangulateMesh();
     void getMeshObj();
-
+    // mesh(int total_verts);
 };
 
 
@@ -35,6 +35,11 @@ class Vertex
     public:
     int id; //index of the vertex in the vertexPositions array.
     HalfEdge *halfEdge;
+
+    Vertex(int ID)
+    {
+        id = ID;
+    }
 };
 
 class Face 

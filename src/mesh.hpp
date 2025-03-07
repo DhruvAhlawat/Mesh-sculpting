@@ -10,9 +10,14 @@ class mesh
     std::vector<vec3> vertexPositions;
     std::vector<ivec3> triangles;
     std::vector<vec3> normals;
+    std::vector<ivec2> edges; 
+
     std::vector<HalfEdge> halfEdges;
     std::vector<Vertex> verts;
     std::vector<Face> faces;
+    //triangulates the mesh for rasterization. 
+    void triangulateMesh();
+
 };
 
 
@@ -27,6 +32,7 @@ class HalfEdge
 class Vertex 
 {
     public:
+    int id; //index of the vertex in the vertexPositions array.
     HalfEdge *halfEdge;
 };
 

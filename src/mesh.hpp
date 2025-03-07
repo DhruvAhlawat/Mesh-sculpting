@@ -17,6 +17,7 @@ class mesh
     std::vector<Face> faces;
     //triangulates the mesh for rasterization. 
     void triangulateMesh();
+    void getMeshObj();
 
 };
 

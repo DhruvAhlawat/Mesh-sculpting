@@ -1,23 +1,3 @@
-
-class HalfEdge
-{
-    public:
-    HalfEdge *pair, *next;
-    Vertex *head;
-    Face *face;
-
-};
+#include "mesh.hpp"
 
 
-class Vertex 
-{
-    public:
-    HalfEdge *halfEdge;
-};
-
-
-class Face 
-{
-    public:
-    HalfEdge *halfEdge;
-};

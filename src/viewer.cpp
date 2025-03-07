@@ -1,5 +1,7 @@
 #include "viewer.hpp"
+#include "mesh.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+
 #include <iostream>
 namespace COL781 {
     namespace Viewer {

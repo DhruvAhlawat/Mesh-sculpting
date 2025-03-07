@@ -1,26 +1,12 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <cmath>
 using namespace glm;
 
 
-class mesh 
-{
-    public:
-    std::vector<vec3> vertexPositions;
-    std::vector<ivec3> triangles;
-    std::vector<vec3> normals;
-    std::vector<ivec2> edges; 
-
-    std::vector<HalfEdge> halfEdges;
-    std::vector<Vertex> verts;
-    std::vector<Face> faces;
-    //triangulates the mesh for rasterization. 
-    void triangulateMesh();
-    void getMeshObj();
-    // mesh(int total_verts);
-};
-
+class Vertex;
+class Face;
 
 class HalfEdge
 {
@@ -48,3 +34,23 @@ class Face
     HalfEdge *halfEdge;
     int num_sides;
 };
+
+
+class mesh 
+{
+    public:
+    std::vector<vec3> vertexPositions;
+    std::vector<ivec3> triangles;
+    std::vector<vec3> normals;
+    std::vector<ivec2> edges; 
+
+    std::vector<HalfEdge> halfEdges;
+    std::vector<Vertex> verts;
+    std::vector<Face> faces;
+    //triangulates the mesh for rasterization. 
+    void triangulateMesh();
+    void getMeshObj();
+    // mesh(int total_verts);
+};
+
+mesh createGrid(int m, int n);

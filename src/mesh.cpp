@@ -1,5 +1,4 @@
 #include "mesh.hpp"
-#include <cmath>
 using namespace std;
 
 void mesh::triangulateMesh()
@@ -93,10 +92,9 @@ mesh getSphere(int m, int n)
 
 
 }
-#include <glm/glm.hpp>
-#include <vector>
 
-void createGrid(mesh &sq, int m, int n) {
+mesh createGrid(int m, int n) {
+    mesh sq;
     float dx = 1.0f / n;
     float dy = 1.0f / m;
 
@@ -173,4 +171,5 @@ void createGrid(mesh &sq, int m, int n) {
             }
         }
     }
+    return sq;
 }

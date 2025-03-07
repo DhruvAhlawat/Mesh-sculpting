@@ -105,9 +105,11 @@ mesh createGrid(int m, int n) {
         for (int j = 0; j <= m; j++) {
             int idx = i * (m + 1) + j;
             sq.vertexPositions[idx] = vec3(i * dx, j * dy, 0.0f);
+            sq.verts[idx].id = idx;
             sq.verts[idx].halfEdge = nullptr; // No half-edge assigned yet
         }
     }
+
 
     // Step 2: Create faces and half-edges
     sq.faces.resize(m * n);
@@ -120,6 +122,11 @@ mesh createGrid(int m, int n) {
             int v1 = v0 + 1;
             int v2 = v1 + (m + 1);
             int v3 = v0 + (m + 1);
+            
+            sq.edges.push_back(ivec2(v0, v1));
+            sq.edges.push_back(ivec2(v0, v3));
+            if (v2%(m+1) != 0) {sq.edges.push_back(ivec2(v2, v1));}
+            if(v2 > (m+1)*n-1) {sq.edges.push_back(ivec2(v2, v3));}
 
             int fIdx = i * m + j;
             sq.faces[fIdx].num_sides = 4;

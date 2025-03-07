@@ -177,7 +177,7 @@ namespace COL781 {
                 r.setUniform(program, "viewPos", camera.position);
                 r.setUniform(program, "lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-                // r.setupFilledFaces();
+                r.setupFilledFaces();
                 glm::vec3 red(1.0f, 0.0f, 0.0f);
                 glm::vec3 green(0.0f, 1.0f, 0.0f);
                 glm::vec3 blue(0.0f, 0.0f, 1.0f);

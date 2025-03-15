@@ -71,51 +71,6 @@ void createTriangle(Vertex v1, Vertex v2, Vertex v3)
 
 }
 
-mesh getSphere(int m, int n)
-{
-    //assumes that n >= 2 and m >= 3.
-    int total_verts = (n-1)*m + 2; //since the poles are single vertex.
-    mesh sphere;
-    //create the vertices of the sphere.
-    //create the angles phi and theta that we will be using. 
-    vector<float> theta(m), phi(n+1);
-    for(int i = 0; i < m; i++)
-    {
-        theta[i] = 2 * M_PI * i / m;
-    }
-    for(int i = 0; i < n+1; i++)
-    {
-        phi[i] = M_PI * (i / n - 0.5);
-    }   
-
-    //create the pole vertex first. 
-    sphere.vertexPositions.push_back(spherePos(theta[0], phi[0])); //the bottom pole vertex.
-    sphere.verts.push_back(Vertex(0)); //the pole vertex is thus created. 
-
-    //now we need to connect the next layer with this pole vertex. 
-    //at phi[1]
-    sphere.vertexPositions.push_back(spherePos(theta[0], phi[1]));
-    sphere.verts.push_back(Vertex(1)); 
-
-
-    sphere.halfEdges.push_back(HalfEdge());
-    sphere.halfEdges[0].head = &sphere.verts[0]; //EZ.
-    sphere.verts[0].halfEdge = &sphere.halfEdges[0]; sphere.verts[1].halfEdge = &sphere.halfEdges[0]; //pointing both of the vertices to this halfEdge. 
-    
-    
-    
-    for(int i = 1; i < m; i++)
-    {
-        sphere.vertexPositions.push_back(spherePos(theta[i], phi[1]));
-        sphere.verts.push_back(Vertex(i+1));
-
-    }
-
-
-
-
-}
-
 mesh createGrid(int m, int n) {
     mesh sq;
     float dx = 1.0f / n;
@@ -129,9 +84,11 @@ mesh createGrid(int m, int n) {
             int idx = i * (m + 1) + j;
             sq.vertexPositions[idx] = vec3(i * dx, j * dy, 0.0f);
             sq.verts[idx].id = idx;
+            sq.verts[idx].id = idx;
             sq.verts[idx].halfEdge = nullptr; // No half-edge assigned yet
         }
     }
+
 
     // Step 2: Create faces and half-edges
     sq.faces.resize(m * n);
@@ -144,6 +101,11 @@ mesh createGrid(int m, int n) {
             int v1 = v0 + 1;
             int v2 = v1 + (m + 1);
             int v3 = v0 + (m + 1);
+            
+            sq.edges.push_back(ivec2(v0, v1));
+            sq.edges.push_back(ivec2(v0, v3));
+            if (v2%(m+1) != 0) {sq.edges.push_back(ivec2(v2, v1));}
+            if(v2 > (m+1)*n-1) {sq.edges.push_back(ivec2(v2, v3));}
 
             int fIdx = i * m + j;
             sq.faces[fIdx].num_sides = 4;
@@ -156,7 +118,7 @@ mesh createGrid(int m, int n) {
             e2->head = &sq.verts[v2];
             e3->head = &sq.verts[v3];
             e0->face = e1->face = e2->face = e3->face = &sq.faces[fIdx];
-
+            
             sq.faces[fIdx].halfEdge = e0;
 
             // Store half-edges for twin assignment
@@ -196,4 +158,203 @@ mesh createGrid(int m, int n) {
         }
     }
     return sq;
+}
+
+mesh generateSphere(int m, int n) {
+    mesh sphereMesh;
+    
+    // vertices
+    for (int j = 1; j < n; j++) { // Exclude poles
+        float phi = M_PI * j / n;
+        for (int i = 0; i < m; i++) {
+            float theta = 2.0f * M_PI * i / m;
+            float x = cos(theta) * sin(phi);
+            float y = sin(theta) * sin(phi);
+            float z = cos(phi);
+            sphereMesh.vertexPositions.emplace_back(x, y, z);
+        }
+    }
+
+    // Add poles
+    int northPoleIndex = sphereMesh.vertexPositions.size();
+    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
+
+    int southPoleIndex = sphereMesh.vertexPositions.size();
+    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
+
+    // Generate faces and edges
+    for (int j = 0; j < n - 2; j++) { // Iterate over stacks
+        for (int i = 0; i < m; i++) { // Iterate over slices
+            int nextI = (i + 1) % m;
+            int currRow = j * m;
+            int nextRow = (j + 1) * m;
+
+            // Create two triangles per quad
+            sphereMesh.triangles.emplace_back(currRow + i, nextRow + i, nextRow + nextI);
+            sphereMesh.triangles.emplace_back(currRow + i, nextRow + nextI, currRow + nextI);
+
+            // Store edges
+            sphereMesh.edges.emplace_back(currRow + i, nextRow + i);
+            sphereMesh.edges.emplace_back(nextRow + i, nextRow + nextI);
+            sphereMesh.edges.emplace_back(nextRow + nextI, currRow + nextI);
+            sphereMesh.edges.emplace_back(currRow + nextI, currRow + i);
+        }
+    }
+
+    // Connect top cap
+    for (int i = 0; i < m; i++) {
+        int nextI = (i + 1) % m;
+        sphereMesh.triangles.emplace_back(northPoleIndex, i, nextI);
+        sphereMesh.edges.emplace_back(northPoleIndex, i);
+        sphereMesh.edges.emplace_back(i, nextI);
+    }
+
+    // Connect bottom cap
+    int bottomStart = (n - 2) * m;
+    for (int i = 0; i < m; i++) {
+        int nextI = (i + 1) % m;
+        sphereMesh.triangles.emplace_back(southPoleIndex, bottomStart + nextI, bottomStart + i);
+        sphereMesh.edges.emplace_back(southPoleIndex, bottomStart + nextI);
+        sphereMesh.edges.emplace_back(bottomStart + nextI, bottomStart + i);
+    }
+
+    sphereMesh.normals = sphereMesh.vertexPositions;
+
+    return sphereMesh;
+}
+
+
+mesh generateCube(int m, int n, int o) {
+    mesh cubeMesh;
+    std::vector<std::vector<std::vector<int>>> vertexIndices(m + 1, std::vector<std::vector<int>>(n + 1, std::vector<int>(o + 1, -1)));
+
+    // Generate vertices
+    int index = 0;
+    for (int i = 0; i <= m; i++) {
+        float x = -0.5f + i / float(m);
+        for (int j = 0; j <= n; j++) {
+            float y = -0.5f + j / float(n);
+            for (int k = 0; k <= o; k++) {
+                float z = -0.5f + k / float(o);
+                cubeMesh.vertexPositions.emplace_back(x, y, z);
+                vertexIndices[i][j][k] = index++;
+            }
+        }
+    }
+
+    // Generate faces and edges
+    auto addQuad = [&](int v0, int v1, int v2, int v3) {
+        cubeMesh.triangles.emplace_back(v0, v1, v2);
+        cubeMesh.triangles.emplace_back(v0, v2, v3);
+        cubeMesh.edges.emplace_back(v0, v1);
+        cubeMesh.edges.emplace_back(v1, v2);
+        cubeMesh.edges.emplace_back(v2, v3);
+        cubeMesh.edges.emplace_back(v3, v0);
+    };
+
+    // Generate faces
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            addQuad(vertexIndices[i][j][0], vertexIndices[i + 1][j][0], vertexIndices[i + 1][j + 1][0], vertexIndices[i][j + 1][0]); // -Z face
+            addQuad(vertexIndices[i][j][o], vertexIndices[i][j + 1][o], vertexIndices[i + 1][j + 1][o], vertexIndices[i + 1][j][o]); // +Z face
+        }
+    }
+    for (int i = 0; i < m; i++) {
+        for (int k = 0; k < o; k++) {
+            addQuad(vertexIndices[i][0][k], vertexIndices[i + 1][0][k], vertexIndices[i + 1][0][k + 1], vertexIndices[i][0][k + 1]); // -Y face
+            addQuad(vertexIndices[i][n][k], vertexIndices[i][n][k + 1], vertexIndices[i + 1][n][k + 1], vertexIndices[i + 1][n][k]); // +Y face
+        }
+    }
+    for (int j = 0; j < n; j++) {
+        for (int k = 0; k < o; k++) {
+            addQuad(vertexIndices[0][j][k], vertexIndices[0][j + 1][k], vertexIndices[0][j + 1][k + 1], vertexIndices[0][j][k + 1]); // -X face
+            addQuad(vertexIndices[m][j][k], vertexIndices[m][j][k + 1], vertexIndices[m][j + 1][k + 1], vertexIndices[m][j + 1][k]); // +X face
+        }
+    }
+
+    return cubeMesh;
+}
+
+
+mesh loadOBJ(const std::string& filename) {
+    mesh mesh;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open OBJ file: " << filename << std::endl;
+        return mesh;
+    }
+
+    std::vector<glm::vec3> tempNormals;
+    std::vector<std::vector<int>> faceEdges;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string prefix;
+        iss >> prefix;
+
+        if (prefix == "v") {
+            // Read vertex position
+            glm::vec3 vertex;
+            iss >> vertex.x >> vertex.y >> vertex.z;
+            mesh.vertexPositions.push_back(vertex);
+
+        } else if (prefix == "vn") {
+            // Read vertex normal
+            glm::vec3 normal;
+            iss >> normal.x >> normal.y >> normal.z;
+            tempNormals.push_back(normal);
+
+        } else if (prefix == "f") {
+            // Read face (triangles or n-gons)
+            std::vector<int> faceIndices;
+            std::string vertInfo;
+            while (iss >> vertInfo) {
+                std::istringstream vertStream(vertInfo);
+                std::string vIndex;
+                std::getline(vertStream, vIndex, '/'); // Extract vertex index (ignore textures/normals)
+                int vertexIdx = std::stoi(vIndex) - 1; // Convert to 0-based indexing
+                faceIndices.push_back(vertexIdx);
+            }
+
+            // Triangulate n-gon into a triangle fan
+            for (size_t i = 1; i < faceIndices.size() - 1; i++) {
+                mesh.triangles.emplace_back(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+            }
+
+            // Store original polygon edges for visualization
+            for (size_t i = 0; i < faceIndices.size(); i++) {
+                mesh.edges.emplace_back(faceIndices[i], faceIndices[(i + 1) % faceIndices.size()]);
+            }
+        }
+    }
+
+    file.close();
+    return mesh;
+}
+
+void recomputeVertexNormals(mesh& mesh) {
+    // Reset normals
+    mesh.normals.assign(mesh.vertexPositions.size(), glm::vec3(0.0f));
+
+    // Compute face normals and accumulate into vertex normals
+    for (const auto& tri : mesh.triangles) {
+        glm::vec3 v0 = mesh.vertexPositions[tri.x];
+        glm::vec3 v1 = mesh.vertexPositions[tri.y];
+        glm::vec3 v2 = mesh.vertexPositions[tri.z];
+
+        // Compute face normal using cross product
+        glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+
+        // Accumulate normal weighted by face area
+        float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
+        mesh.normals[tri.x] += normal * area;
+        mesh.normals[tri.y] += normal * area;
+        mesh.normals[tri.z] += normal * area;
+    }
+
+    // Normalize all vertex normals
+    for (auto& normal : mesh.normals) {
+        normal = glm::normalize(normal);
+    }
 }

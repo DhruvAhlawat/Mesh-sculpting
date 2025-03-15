@@ -1,5 +1,6 @@
 #include "viewer.hpp"
-#include "mesh.hpp";
+#include "mesh.hpp"
+
 namespace V = COL781::Viewer;
 using namespace glm;
 
@@ -97,9 +98,15 @@ int main() {
     if (!v.initialize("Mesh viewer", 640, 480)) {
         return EXIT_FAILURE;
     }
-    mesh sq = createGrid(10, 10);
+    // mesh sq = createGrid(40, 40);
+    // mesh sq = generateSphere(40, 40);
+    // mesh sq = generateCube(10,10,10);
+    mesh sq = loadOBJ("meshes/bunny_1k.obj");
     sq.triangulateMesh(); //creates the triangles.
-    v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], nullptr);
+    recomputeVertexNormals(sq);
+
+    v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], &sq.normals[0]);
     // v.setMesh(20, 10, 12, vertices, triangles, edges, normals);
+    
     v.view();
 }

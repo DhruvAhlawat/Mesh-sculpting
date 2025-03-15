@@ -1,7 +1,7 @@
 #include "mesh.hpp"
 using namespace std;
 
-void mesh::triangulateMesh()
+void Mesh::triangulateMesh()
 {
     //will require us to create more edges and hence more faces as well. so the current faces and edges array will have to be completely refreshed.
     vector<ivec3> newTriangles;
@@ -32,7 +32,7 @@ void mesh::triangulateMesh()
     //dont really need to update the edges array as the edges will remain the same on displaying
 }
 
-void mesh::recalculateNormals()
+void Mesh::recalculateNormals()
 {
     //for each vertex we will traverse its neighbouring faces and calculate their normals and then average them out.
     this->normals = vector<vec3>(verts.size());
@@ -54,6 +54,17 @@ void mesh::recalculateNormals()
     } //recalculates the normals for each vertex based on average of its neighbouring faces. Simple calc.
 }
 
+void Mesh::clear()
+{
+    vertexPositions.clear();
+    triangles.clear();
+    normals.clear();
+    edges.clear();
+    halfEdges.clear();
+    verts.clear();
+    faces.clear();
+}
+
 // mesh::mesh(int total_verts)
 // {
 //     vertexPositions = vector
@@ -71,8 +82,8 @@ void createTriangle(Vertex v1, Vertex v2, Vertex v3)
 
 }
 
-mesh createGrid(int m, int n) {
-    mesh sq;
+Mesh createGrid(int m, int n) {
+    Mesh sq;
     float dx = 1.0f / n;
     float dy = 1.0f / m;
 
@@ -160,8 +171,8 @@ mesh createGrid(int m, int n) {
     return sq;
 }
 
-mesh generateSphere(int m, int n) {
-    mesh sphereMesh;
+Mesh generateSphere(int m, int n) {
+    Mesh sphereMesh;
     
     // vertices
     for (int j = 1; j < n; j++) { // Exclude poles
@@ -223,9 +234,8 @@ mesh generateSphere(int m, int n) {
     return sphereMesh;
 }
 
-
-mesh generateCube(int m, int n, int o) {
-    mesh cubeMesh;
+Mesh generateCube(int m, int n, int o) {
+    Mesh cubeMesh;
     std::vector<std::vector<std::vector<int>>> vertexIndices(m + 1, std::vector<std::vector<int>>(n + 1, std::vector<int>(o + 1, -1)));
 
     // Generate vertices
@@ -276,8 +286,8 @@ mesh generateCube(int m, int n, int o) {
 }
 
 
-mesh loadOBJ(const std::string& filename) {
-    mesh mesh;
+Mesh loadOBJ(const std::string& filename) {
+    Mesh mesh;
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Failed to open OBJ file: " << filename << std::endl;
@@ -333,7 +343,7 @@ mesh loadOBJ(const std::string& filename) {
     return mesh;
 }
 
-void recomputeVertexNormals(mesh& mesh) {
+void recomputeVertexNormals(Mesh& mesh) {
     // Reset normals
     mesh.normals.assign(mesh.vertexPositions.size(), glm::vec3(0.0f));
 
@@ -357,4 +367,87 @@ void recomputeVertexNormals(mesh& mesh) {
     for (auto& normal : mesh.normals) {
         normal = glm::normalize(normal);
     }
+}
+
+void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals)
+{
+    getMeshFromVerts(m, vertexPositions, faces);
+    m.normals = normals;
+
+}
+
+void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces)
+{
+    m.clear();
+    m.vertexPositions = vertexPositions;
+    for(int i = 0; i < vertexPositions.size(); i++)
+    {
+        m.verts.emplace_back(i); //creates a vertex object with the ith id.
+    }  // no pointers to consider yet so can use emplaceback. 
+
+    //now we will form an edge mapping. 
+    //from this we will form the halfedges and faces. this map will store the index of the halfedge between the two vertices.
+    map<pair<int,int>, int> halfEdgeMap;
+    //the map stores the location of the half edge corresponding to these vertices in the direction of first to second.
+    set<ivec2> edges;
+    m.faces = vector<Face>(faces.size());
+    int total_halfedges = 0;
+
+    //we will iterate over the faces and create the halfedges and faces and only assign the face and vertex pointers.
+    for(int i = 0; i < faces.size(); i++)
+    {
+        //now connect all the vertices in the face.
+        vector<int> face = faces[i];        
+        m.faces[i].num_sides = face.size(); 
+        face.push_back(face[0]); //to close the loop, to make it easier in the following loops.
+        
+        //loop that initializes all the half edges for this face (and their pairs).
+        for(int j = 0; j < face.size() - 1; j++)
+        {
+            int v1 = face[j], v2 = face[j+1];
+            //we will make sure that we always go in the correct order 
+            if(halfEdgeMap.count({v1,v2}) == 0) //if doesnt exist we create it.
+            {
+                //create a new halfedge here.
+                //only apply the vert and faces pointers for now.
+                m.halfEdges.emplace_back(nullptr, nullptr, &m.verts[v2], &m.faces[i]);
+                halfEdgeMap[{v1,v2}] = m.halfEdges.size() - 1;
+            }
+            m.halfEdges[halfEdgeMap[{v1,v2}]].face = &m.faces[i];
+            m.halfEdges[halfEdgeMap[{v1,v2}]].head = &m.verts[v1];
+            
+            //we also create its twin if it doesn't exist yet. With no face initially.
+            if(halfEdgeMap.count({v2,v1}) == 0)
+            {
+                //we create it if it doesn't exist. EZ
+                m.halfEdges.emplace_back(nullptr, nullptr, &m.verts[v1], nullptr);
+                halfEdgeMap[{v2,v1}] = m.halfEdges.size() - 1;
+            }            
+        }
+
+        //after this we have the halfEdges, verts, faces vector all ready without any further size changes.
+        for(int i = 0; i < faces.size(); i++)
+        {
+            //now we can assign the next and pair pointers for all the halfEdges.
+            vector<int> face = faces[i];
+            face.push_back(face[0]); face.push_back(face[1]); 
+
+            for(int j = 0; j < face.size() - 2; j++)
+            {
+                int v1 = face[j], v2 = face[j+1];
+                int curHalfEdge = halfEdgeMap[{v1,v2}];
+                int nextHalfEdge = halfEdgeMap[{v2,face[j+2]}];
+                int pairedHalfEdge = halfEdgeMap[{v2, v1}];
+                m.halfEdges[curHalfEdge].next = &m.halfEdges[nextHalfEdge];
+                m.halfEdges[curHalfEdge].pair = &m.halfEdges[pairedHalfEdge];
+                m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
+            
+                m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge];
+            }
+
+            //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
+            m.faces[i].halfEdge = &m.halfEdges[halfEdgeMap[{face[0], face[1]}]];
+        }
+    }
+
 }

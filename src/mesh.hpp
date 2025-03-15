@@ -2,7 +2,9 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cmath>
-
+#include <unordered_map>
+#include<set>
+#include <map>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -19,6 +21,21 @@ class HalfEdge
     HalfEdge *pair, *next;
     Vertex *head;
     Face *face;
+
+    HalfEdge(HalfEdge *Pair, HalfEdge *Next, Vertex *Head, Face *Face)
+    {
+        pair = Pair;
+        next = Next;
+        head = Head;
+        face = Face;
+    }
+    HalfEdge()
+    {
+        pair = nullptr;
+        next = nullptr;
+        head = nullptr;
+        face = nullptr;
+    }
 };
 
 class Vertex 
@@ -30,11 +47,13 @@ class Vertex
     Vertex(int ID)
     {
         id = ID;
+        halfEdge = nullptr;
     }
 
     Vertex()
     {
         id = -1;
+        halfEdge = nullptr;
     }
 };
 
@@ -43,10 +62,21 @@ class Face
     public:
     HalfEdge *halfEdge;
     int num_sides;
+
+    Face(int sides)
+    {
+        num_sides = sides;
+        halfEdge = nullptr; //always initialize with nullptr.
+    }
+    Face()
+    {
+        num_sides = 0;
+        halfEdge = nullptr;
+    }
 };
 
 
-class mesh 
+class Mesh 
 {
     public:
     std::vector<vec3> vertexPositions;
@@ -61,11 +91,16 @@ class mesh
     void triangulateMesh();
     void recalculateNormals();
     void getMeshObj();
+    void clear(); //refreshes the mesh by clearing all the vectors.
     // mesh(int total_verts);
 };
 
-mesh createGrid(int m, int n);
-mesh generateSphere(int m, int n);
-mesh generateCube(int m, int n, int o);
-mesh loadOBJ(const std::string& filename);
-void recomputeVertexNormals(mesh& mesh);
+Mesh createGrid(int m, int n);
+Mesh generateSphere(int m, int n);
+Mesh generateCube(int m, int n, int o);
+Mesh loadOBJ(const std::string& filename);
+void recomputeVertexNormals(Mesh& mesh);
+
+Mesh getMeshFromObj(const std::string &filename);
+void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals);
+void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);

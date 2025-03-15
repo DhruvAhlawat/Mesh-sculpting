@@ -244,3 +244,61 @@ mesh generateCube(int m, int n, int o) {
 
     return cubeMesh;
 }
+
+
+mesh loadOBJ(const std::string& filename) {
+    mesh mesh;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open OBJ file: " << filename << std::endl;
+        return mesh;
+    }
+
+    std::vector<glm::vec3> tempNormals;
+    std::vector<std::vector<int>> faceEdges;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string prefix;
+        iss >> prefix;
+
+        if (prefix == "v") {
+            // Read vertex position
+            glm::vec3 vertex;
+            iss >> vertex.x >> vertex.y >> vertex.z;
+            mesh.vertexPositions.push_back(vertex);
+
+        } else if (prefix == "vn") {
+            // Read vertex normal
+            glm::vec3 normal;
+            iss >> normal.x >> normal.y >> normal.z;
+            tempNormals.push_back(normal);
+
+        } else if (prefix == "f") {
+            // Read face (triangles or n-gons)
+            std::vector<int> faceIndices;
+            std::string vertInfo;
+            while (iss >> vertInfo) {
+                std::istringstream vertStream(vertInfo);
+                std::string vIndex;
+                std::getline(vertStream, vIndex, '/'); // Extract vertex index (ignore textures/normals)
+                int vertexIdx = std::stoi(vIndex) - 1; // Convert to 0-based indexing
+                faceIndices.push_back(vertexIdx);
+            }
+
+            // Triangulate n-gon into a triangle fan
+            for (size_t i = 1; i < faceIndices.size() - 1; i++) {
+                mesh.triangles.emplace_back(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+            }
+
+            // Store original polygon edges for visualization
+            for (size_t i = 0; i < faceIndices.size(); i++) {
+                mesh.edges.emplace_back(faceIndices[i], faceIndices[(i + 1) % faceIndices.size()]);
+            }
+        }
+    }
+
+    file.close();
+    return mesh;
+}

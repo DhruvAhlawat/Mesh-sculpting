@@ -2,6 +2,11 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cmath>
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+
 using namespace glm;
 
 
@@ -61,3 +66,4 @@ class mesh
 mesh createGrid(int m, int n);
 mesh generateSphere(int m, int n);
 mesh generateCube(int m, int n, int o);
+mesh loadOBJ(const std::string& filename);

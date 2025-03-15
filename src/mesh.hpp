@@ -26,6 +26,11 @@ class Vertex
     {
         id = ID;
     }
+
+    Vertex()
+    {
+        id = -1;
+    }
 };
 
 class Face 
@@ -54,3 +59,5 @@ class mesh
 };
 
 mesh createGrid(int m, int n);
+mesh getSphere(int m, int n);
+mesh generateSphere(int m, int n);

@@ -31,12 +31,6 @@ void mesh::triangulateMesh()
     //dont really need to update the edges array as the edges will remain the same on displaying
 }
 
-// mesh::mesh(int total_verts)
-// {
-//     vertexPositions = vector
-// }
-
-
 vec3 spherePos(float theta, float phi)
 {
     return vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi));
@@ -45,51 +39,6 @@ vec3 spherePos(float theta, float phi)
 
 void createTriangle(Vertex v1, Vertex v2, Vertex v3)
 {
-
-}
-
-mesh getSphere(int m, int n)
-{
-    //assumes that n >= 2 and m >= 3.
-    int total_verts = (n-1)*m + 2; //since the poles are single vertex.
-    mesh sphere;
-    //create the vertices of the sphere.
-    //create the angles phi and theta that we will be using. 
-    vector<float> theta(m), phi(n+1);
-    for(int i = 0; i < m; i++)
-    {
-        theta[i] = 2 * M_PI * i / m;
-    }
-    for(int i = 0; i < n+1; i++)
-    {
-        phi[i] = M_PI * (i / n - 0.5);
-    }   
-
-    //create the pole vertex first. 
-    sphere.vertexPositions.push_back(spherePos(theta[0], phi[0])); //the bottom pole vertex.
-    sphere.verts.push_back(Vertex(0)); //the pole vertex is thus created. 
-
-    //now we need to connect the next layer with this pole vertex. 
-    //at phi[1]
-    sphere.vertexPositions.push_back(spherePos(theta[0], phi[1]));
-    sphere.verts.push_back(Vertex(1)); 
-
-
-    sphere.halfEdges.push_back(HalfEdge());
-    sphere.halfEdges[0].head = &sphere.verts[0]; //EZ.
-    sphere.verts[0].halfEdge = &sphere.halfEdges[0]; sphere.verts[1].halfEdge = &sphere.halfEdges[0]; //pointing both of the vertices to this halfEdge. 
-    
-    
-    
-    for(int i = 1; i < m; i++)
-    {
-        sphere.vertexPositions.push_back(spherePos(theta[i], phi[1]));
-        sphere.verts.push_back(Vertex(i+1));
-
-    }
-
-
-
 
 }
 
@@ -139,7 +88,7 @@ mesh createGrid(int m, int n) {
             e2->head = &sq.verts[v2];
             e3->head = &sq.verts[v3];
             e0->face = e1->face = e2->face = e3->face = &sq.faces[fIdx];
-
+            
             sq.faces[fIdx].halfEdge = e0;
 
             // Store half-edges for twin assignment
@@ -179,4 +128,67 @@ mesh createGrid(int m, int n) {
         }
     }
     return sq;
+}
+
+mesh generateSphere(int m, int n) {
+    mesh sphereMesh;
+    
+    // vertices
+    for (int j = 1; j < n; j++) { // Exclude poles
+        float phi = M_PI * j / n;
+        for (int i = 0; i < m; i++) {
+            float theta = 2.0f * M_PI * i / m;
+            float x = cos(theta) * sin(phi);
+            float y = sin(theta) * sin(phi);
+            float z = cos(phi);
+            sphereMesh.vertexPositions.emplace_back(x, y, z);
+        }
+    }
+
+    // Add poles
+    int northPoleIndex = sphereMesh.vertexPositions.size();
+    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
+
+    int southPoleIndex = sphereMesh.vertexPositions.size();
+    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
+
+    // Generate faces and edges
+    for (int j = 0; j < n - 2; j++) { // Iterate over stacks
+        for (int i = 0; i < m; i++) { // Iterate over slices
+            int nextI = (i + 1) % m;
+            int currRow = j * m;
+            int nextRow = (j + 1) * m;
+
+            // Create two triangles per quad
+            sphereMesh.triangles.emplace_back(currRow + i, nextRow + i, nextRow + nextI);
+            sphereMesh.triangles.emplace_back(currRow + i, nextRow + nextI, currRow + nextI);
+
+            // Store edges
+            sphereMesh.edges.emplace_back(currRow + i, nextRow + i);
+            sphereMesh.edges.emplace_back(nextRow + i, nextRow + nextI);
+            sphereMesh.edges.emplace_back(nextRow + nextI, currRow + nextI);
+            sphereMesh.edges.emplace_back(currRow + nextI, currRow + i);
+        }
+    }
+
+    // Connect top cap
+    for (int i = 0; i < m; i++) {
+        int nextI = (i + 1) % m;
+        sphereMesh.triangles.emplace_back(northPoleIndex, i, nextI);
+        sphereMesh.edges.emplace_back(northPoleIndex, i);
+        sphereMesh.edges.emplace_back(i, nextI);
+    }
+
+    // Connect bottom cap
+    int bottomStart = (n - 2) * m;
+    for (int i = 0; i < m; i++) {
+        int nextI = (i + 1) % m;
+        sphereMesh.triangles.emplace_back(southPoleIndex, bottomStart + nextI, bottomStart + i);
+        sphereMesh.edges.emplace_back(southPoleIndex, bottomStart + nextI);
+        sphereMesh.edges.emplace_back(bottomStart + nextI, bottomStart + i);
+    }
+
+    sphereMesh.normals = sphereMesh.vertexPositions;
+
+    return sphereMesh;
 }

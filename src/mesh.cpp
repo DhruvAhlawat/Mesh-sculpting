@@ -302,3 +302,29 @@ mesh loadOBJ(const std::string& filename) {
     file.close();
     return mesh;
 }
+
+void recomputeVertexNormals(mesh& mesh) {
+    // Reset normals
+    mesh.normals.assign(mesh.vertexPositions.size(), glm::vec3(0.0f));
+
+    // Compute face normals and accumulate into vertex normals
+    for (const auto& tri : mesh.triangles) {
+        glm::vec3 v0 = mesh.vertexPositions[tri.x];
+        glm::vec3 v1 = mesh.vertexPositions[tri.y];
+        glm::vec3 v2 = mesh.vertexPositions[tri.z];
+
+        // Compute face normal using cross product
+        glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+
+        // Accumulate normal weighted by face area
+        float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
+        mesh.normals[tri.x] += normal * area;
+        mesh.normals[tri.y] += normal * area;
+        mesh.normals[tri.z] += normal * area;
+    }
+
+    // Normalize all vertex normals
+    for (auto& normal : mesh.normals) {
+        normal = glm::normalize(normal);
+    }
+}

@@ -103,8 +103,9 @@ int main() {
     // mesh sq = generateCube(10,10,10);
     mesh sq = loadOBJ("meshes/bunny_1k.obj");
     sq.triangulateMesh(); //creates the triangles.
+    recomputeVertexNormals(sq);
 
-    v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], nullptr);
+    v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], &sq.normals[0]);
     // v.setMesh(20, 10, 12, vertices, triangles, edges, normals);
     
     v.view();

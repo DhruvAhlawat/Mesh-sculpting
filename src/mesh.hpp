@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cmath>
+#include <iostream>
 using namespace glm;
 
 
@@ -26,6 +27,10 @@ class Vertex
     {
         id = ID;
     }
+    Vertex ()
+    {
+        id = -1;
+    }
 };
 
 class Face 
@@ -49,6 +54,7 @@ class mesh
     std::vector<Face> faces;
     //triangulates the mesh for rasterization. 
     void triangulateMesh();
+    void recalculateNormals();
     void getMeshObj();
     // mesh(int total_verts);
 };

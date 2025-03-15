@@ -25,10 +25,33 @@ void mesh::triangulateMesh()
             he = he->next;
             newFace[2] = he->head->id;
             newTriangles.push_back(newFace);
+            cout << "new triangle face: " << newFace[0] << " " << newFace[1] << " " << newFace[2] << endl;
         }
     }
     this->triangles = newTriangles; //updates the triangles array for us.
     //dont really need to update the edges array as the edges will remain the same on displaying
+}
+
+void mesh::recalculateNormals()
+{
+    //for each vertex we will traverse its neighbouring faces and calculate their normals and then average them out.
+    this->normals = vector<vec3>(verts.size());
+    for(int i = 0; i < verts.size(); i++)
+    {
+        vec3 normal = vec3(0.0, 0.0, 0.0);
+        HalfEdge *he = verts[i].halfEdge;
+        do
+        { 
+            int v1 = he->head->id;
+            he = he->pair->next; 
+            int v2 = he->head->id;
+            vec3 crossprod = cross(vertexPositions[v1] - vertexPositions[i], vertexPositions[v2] - vertexPositions[i]);
+            crossprod = normalize(crossprod);
+            normal += crossprod; 
+        } while(he != verts[i].halfEdge && he != nullptr);
+        normal = normalize(normal);
+        this->normals[i] = normal;
+    } //recalculates the normals for each vertex based on average of its neighbouring faces. Simple calc.
 }
 
 // mesh::mesh(int total_verts)
@@ -105,6 +128,7 @@ mesh createGrid(int m, int n) {
         for (int j = 0; j <= m; j++) {
             int idx = i * (m + 1) + j;
             sq.vertexPositions[idx] = vec3(i * dx, j * dy, 0.0f);
+            sq.verts[idx].id = idx;
             sq.verts[idx].halfEdge = nullptr; // No half-edge assigned yet
         }
     }

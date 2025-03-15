@@ -59,5 +59,5 @@ class mesh
 };
 
 mesh createGrid(int m, int n);
-mesh getSphere(int m, int n);
 mesh generateSphere(int m, int n);
+mesh generateCube(int m, int n, int o);

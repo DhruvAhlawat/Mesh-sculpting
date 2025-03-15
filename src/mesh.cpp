@@ -192,3 +192,55 @@ mesh generateSphere(int m, int n) {
 
     return sphereMesh;
 }
+
+
+mesh generateCube(int m, int n, int o) {
+    mesh cubeMesh;
+    std::vector<std::vector<std::vector<int>>> vertexIndices(m + 1, std::vector<std::vector<int>>(n + 1, std::vector<int>(o + 1, -1)));
+
+    // Generate vertices
+    int index = 0;
+    for (int i = 0; i <= m; i++) {
+        float x = -0.5f + i / float(m);
+        for (int j = 0; j <= n; j++) {
+            float y = -0.5f + j / float(n);
+            for (int k = 0; k <= o; k++) {
+                float z = -0.5f + k / float(o);
+                cubeMesh.vertexPositions.emplace_back(x, y, z);
+                vertexIndices[i][j][k] = index++;
+            }
+        }
+    }
+
+    // Generate faces and edges
+    auto addQuad = [&](int v0, int v1, int v2, int v3) {
+        cubeMesh.triangles.emplace_back(v0, v1, v2);
+        cubeMesh.triangles.emplace_back(v0, v2, v3);
+        cubeMesh.edges.emplace_back(v0, v1);
+        cubeMesh.edges.emplace_back(v1, v2);
+        cubeMesh.edges.emplace_back(v2, v3);
+        cubeMesh.edges.emplace_back(v3, v0);
+    };
+
+    // Generate faces
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            addQuad(vertexIndices[i][j][0], vertexIndices[i + 1][j][0], vertexIndices[i + 1][j + 1][0], vertexIndices[i][j + 1][0]); // -Z face
+            addQuad(vertexIndices[i][j][o], vertexIndices[i][j + 1][o], vertexIndices[i + 1][j + 1][o], vertexIndices[i + 1][j][o]); // +Z face
+        }
+    }
+    for (int i = 0; i < m; i++) {
+        for (int k = 0; k < o; k++) {
+            addQuad(vertexIndices[i][0][k], vertexIndices[i + 1][0][k], vertexIndices[i + 1][0][k + 1], vertexIndices[i][0][k + 1]); // -Y face
+            addQuad(vertexIndices[i][n][k], vertexIndices[i][n][k + 1], vertexIndices[i + 1][n][k + 1], vertexIndices[i + 1][n][k]); // +Y face
+        }
+    }
+    for (int j = 0; j < n; j++) {
+        for (int k = 0; k < o; k++) {
+            addQuad(vertexIndices[0][j][k], vertexIndices[0][j + 1][k], vertexIndices[0][j + 1][k + 1], vertexIndices[0][j][k + 1]); // -X face
+            addQuad(vertexIndices[m][j][k], vertexIndices[m][j][k + 1], vertexIndices[m][j + 1][k + 1], vertexIndices[m][j + 1][k]); // +X face
+        }
+    }
+
+    return cubeMesh;
+}

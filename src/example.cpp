@@ -99,7 +99,8 @@ int main() {
         return EXIT_FAILURE;
     }
     // mesh sq = createGrid(40, 40);
-    mesh sq = generateSphere(40, 40);
+    // mesh sq = generateSphere(40, 40);
+    mesh sq = generateCube(10,10,10);
     sq.triangulateMesh(); //creates the triangles.
     v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], nullptr);
     // v.setMesh(20, 10, 12, vertices, triangles, edges, normals);

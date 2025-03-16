@@ -41,10 +41,6 @@ void Mesh::clear()
     faces.clear();
 }
 
-// mesh::mesh(int total_verts)
-// {
-//     vertexPositions = vector
-// }
 
 vec3 spherePos(float theta, float phi)
 {
@@ -260,7 +256,6 @@ Mesh generateCube(int m, int n, int o) {
     return cubeMesh;
 }
 
-
 Mesh loadOBJ(const std::string& filename) {
     Mesh mesh;
     std::ifstream file(filename);
@@ -446,3 +441,74 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
     }
     
 }
+
+HalfEdge *prev(HalfEdge *he)
+{
+    HalfEdge *prev = he;
+    if(he->face == nullptr)
+    {
+        return nullptr; //if there is no face associated then the next pointer will also be null. But should it be?
+    }
+    while(prev->next != he)
+    {
+        prev = prev->next;
+    }
+    return prev;
+}
+
+vector<int> getVertexNeighbours(Mesh &m, int vid)
+{
+    vector<int> neighbours;
+    HalfEdge *he = m.verts[vid].halfEdge;
+    do
+    {
+        neighbours.push_back(he->head->id);
+        he = he->pair->next;
+    } while (he != nullptr && he != m.verts[vid].halfEdge);
+
+    //now incase of vertices present at a boundary of a mesh. The above will not always capture all the neighbours.
+    //so we need to go check the previous vertices as well.
+    he = prev(m.verts[vid].halfEdge); 
+    if(he == nullptr) return neighbours;
+    //first we check if we have a boundary vertex by checking for the presence of this vertex in the neighbours list at the end.
+    if(neighbours[neighbours.size() - 1] == he->pair->head->id)
+    {
+        //if this vertex is already added then we are done.
+        return neighbours;
+    }
+
+    //otherwise we add all the vertices present in the opposite order frmo this halfedge as well.
+    he = he->pair;
+    do
+    {
+       neighbours.push_back(he->head->id);
+       he = prev(he); if(he == nullptr) break;
+       he = he->pair; 
+    } while (he != nullptr);
+    return neighbours;
+}
+
+void UmbrellaSmooth(Mesh &m, float lambda, int iterations)
+{
+    for(int iter = 0; iter < iterations; iter++)
+    {
+        vector<vec3> deltas(m.verts.size(), vec3(0.0f));
+        for(int i = 0; i < m.verts.size(); i++)
+        {
+            Vertex v = m.verts[i];
+            vector<int> neighbours = getVertexNeighbours(m, i);
+            for(int j = 0; j < neighbours.size(); j++)
+            {
+                deltas[i] += (m.vertexPositions[neighbours[j]] - m.vertexPositions[v.id]);
+            }
+            deltas[i] /= neighbours.size();
+        }
+
+        //then we update the positions by lambda * delta
+        for(int i = 0; i < m.verts.size(); i++)
+        {
+            m.vertexPositions[i] += lambda * deltas[i];
+        }
+    }
+}
+

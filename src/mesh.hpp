@@ -90,6 +90,7 @@ class Mesh
     //triangulates the mesh for rasterization. 
     void triangulateMesh();
     void recalculateNormals();
+    void recomputeVertexNormals();
     void getMeshObj();
     void clear(); //refreshes the mesh by clearing all the vectors.
     // mesh(int total_verts);
@@ -99,8 +100,5 @@ Mesh createGrid(int m, int n);
 Mesh generateSphere(int m, int n);
 Mesh generateCube(int m, int n, int o);
 Mesh loadOBJ(const std::string& filename);
-void recomputeVertexNormals(Mesh& mesh);
-
-Mesh getMeshFromObj(const std::string &filename);
-void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals);
-void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);
+void getMeshFromVerts(Mesh &m, std::vector<vec3> &vertexPositions, std::vector<std::vector<int>> &faces, std::vector<vec3> normals = {});
+// void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);

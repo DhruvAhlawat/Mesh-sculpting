@@ -5,53 +5,31 @@ void Mesh::triangulateMesh()
 {
     //will require us to create more edges and hence more faces as well. so the current faces and edges array will have to be completely refreshed.
     vector<ivec3> newTriangles;
-    vector<ivec2> newEdges; //this will get updated but. 
-    vector<HalfEdge> newHalfEdges; 
-
     // we iterate over all the existing faces in our mesh.
     for(int i = 0; i < this->faces.size(); i++)
     {
+        cout << "face: " << i << endl;
         //else we will break it up into smaller pieces using the first vertex as the common vertex. 
         // triangle fanning procedure.
         HalfEdge *he = faces[i].halfEdge;
         int commonVert = he->head->id;
         he = he->next;
         //we will need to cover 2 faces at once and assign the newly created halfedges as their respective pairs.
-        //iterate over the vertices of the face and create new triangles as well as halfedges.
+        //iterate over the vertices of the face and create new triangles 
+
         for(int j = 0; j < faces[i].num_sides - 2; j++)
         {
             ivec3 newFace;
-            newFace[0] = commonVert; newFace[1] = he->head->id; 
+            newFace[0] = commonVert; 
+            newFace[1] = he->head->id; 
             he = he->next;
             newFace[2] = he->head->id;
             newTriangles.push_back(newFace);
-            cout << "new triangle face: " << newFace[0] << " " << newFace[1] << " " << newFace[2] << endl;
+            cout << "   triangle verts: " << newFace[0] << " " << newFace[1] << " " << newFace[2] << endl;
         }
     }
     this->triangles = newTriangles; //updates the triangles array for us.
     //dont really need to update the edges array as the edges will remain the same on displaying
-}
-
-void Mesh::recalculateNormals()
-{
-    //for each vertex we will traverse its neighbouring faces and calculate their normals and then average them out.
-    this->normals = vector<vec3>(verts.size());
-    for(int i = 0; i < verts.size(); i++)
-    {
-        vec3 normal = vec3(0.0, 0.0, 0.0);
-        HalfEdge *he = verts[i].halfEdge;
-        do
-        { 
-            int v1 = he->head->id;
-            he = he->pair->next; 
-            int v2 = he->head->id;
-            vec3 crossprod = cross(vertexPositions[v1] - vertexPositions[i], vertexPositions[v2] - vertexPositions[i]);
-            crossprod = normalize(crossprod);
-            normal += crossprod; 
-        } while(he != verts[i].halfEdge && he != nullptr);
-        normal = normalize(normal);
-        this->normals[i] = normal;
-    } //recalculates the normals for each vertex based on average of its neighbouring faces. Simple calc.
 }
 
 void Mesh::clear()
@@ -69,7 +47,6 @@ void Mesh::clear()
 // {
 //     vertexPositions = vector
 // }
-
 
 vec3 spherePos(float theta, float phi)
 {
@@ -294,20 +271,20 @@ Mesh loadOBJ(const std::string& filename) {
         return mesh;
     }
 
-    std::vector<glm::vec3> tempNormals;
-    std::vector<std::vector<int>> faceEdges;
+    std::vector<glm::vec3> tempNormals; //why temp?
+    std::vector<glm::vec3> vertexPositions;
+    std::vector<std::vector<int>> faces;
 
     std::string line;
     while (std::getline(file, line)) {
         std::istringstream iss(line);
         std::string prefix;
         iss >> prefix;
-
         if (prefix == "v") {
             // Read vertex position
             glm::vec3 vertex;
             iss >> vertex.x >> vertex.y >> vertex.z;
-            mesh.vertexPositions.push_back(vertex);
+            vertexPositions.push_back(vertex);
 
         } else if (prefix == "vn") {
             // Read vertex normal
@@ -326,60 +303,91 @@ Mesh loadOBJ(const std::string& filename) {
                 int vertexIdx = std::stoi(vIndex) - 1; // Convert to 0-based indexing
                 faceIndices.push_back(vertexIdx);
             }
+            faces.push_back(faceIndices); 
 
-            // Triangulate n-gon into a triangle fan
-            for (size_t i = 1; i < faceIndices.size() - 1; i++) {
-                mesh.triangles.emplace_back(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
-            }
+            // // NO Triangulation in the mesh. Only for rendering.
+            // // Triangulate n-gon into a triangle fan
+            // for (size_t i = 1; i < faceIndices.size() - 1; i++) {
+            //     mesh.triangles.emplace_back(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+            // }
 
-            // Store original polygon edges for visualization
-            for (size_t i = 0; i < faceIndices.size(); i++) {
-                mesh.edges.emplace_back(faceIndices[i], faceIndices[(i + 1) % faceIndices.size()]);
-            }
+            // // Store original polygon edges for visualization
+            // for (size_t i = 0; i < faceIndices.size(); i++) {
+            //     mesh.edges.emplace_back(faceIndices[i], faceIndices[(i + 1) % faceIndices.size()]);
+            // }
         }
+
+
+
     }
 
     file.close();
+
+    //the below function also clears the mesh object first. So dont update anything in the mesh before this is called.
+    getMeshFromVerts(mesh, vertexPositions, faces, tempNormals); //this will create the halfedges and faces as well.
     return mesh;
 }
 
-void recomputeVertexNormals(Mesh& mesh) {
+void Mesh::recomputeVertexNormals() 
+{
     // Reset normals
-    mesh.normals.assign(mesh.vertexPositions.size(), glm::vec3(0.0f));
-
+    if(triangles.size() == 0)
+    {
+        cout << "triangulating mesh" << endl;
+        this->triangulateMesh();
+    }
+    normals.assign(vertexPositions.size(), glm::vec3(0.0f));
     // Compute face normals and accumulate into vertex normals
-    for (const auto& tri : mesh.triangles) {
-        glm::vec3 v0 = mesh.vertexPositions[tri.x];
-        glm::vec3 v1 = mesh.vertexPositions[tri.y];
-        glm::vec3 v2 = mesh.vertexPositions[tri.z];
+    for (const auto& tri : triangles) {
+        // cout << "triangle " << tri.x << " " << tri.y << " " << tri.z << endl;
+        glm::vec3 v0 = vertexPositions[tri.x];
+        glm::vec3 v1 = vertexPositions[tri.y];
+        glm::vec3 v2 = vertexPositions[tri.z];
 
         // Compute face normal using cross product
-        glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-
+        glm::vec3 normal = (glm::cross(v1 - v0, v2 - v0));
+        // cout << "   normal: " << normal.x << " " << normal.y << " " << normal.z << endl;
         // Accumulate normal weighted by face area
         float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
-        mesh.normals[tri.x] += normal * area;
-        mesh.normals[tri.y] += normal * area;
-        mesh.normals[tri.z] += normal * area;
+        normals[tri.x] += normal * area; 
+        normals[tri.y] += normal * area; 
+        normals[tri.z] += normal * area; 
     }
 
     // Normalize all vertex normals
-    for (auto& normal : mesh.normals) {
+    for (auto& normal : normals) {
         normal = glm::normalize(normal);
     }
 }
 
-void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals)
-{
-    getMeshFromVerts(m, vertexPositions, faces);
-    m.normals = normals;
+// void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals)
+// {
+//     getMeshFromVerts(m, vertexPositions, faces);
+//     m.normals = normals;
 
-}
+// }
 
-void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces)
+void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> normals)
 {
     m.clear();
+    //prints the inptu.
+    cout << "faces:" << endl;
+    for(int i = 0; i < faces.size(); i++)
+    {
+        cout << "face " << i << ": ";
+        for(int j = 0; j < faces[i].size(); j++)
+        {
+            cout << faces[i][j] << " ";
+        }
+        cout << endl;
+    }
+
     m.vertexPositions = vertexPositions;
+    m.normals = normals;
+    if(m.normals.size() == 0)
+    {
+        m.normals = vector<vec3>(vertexPositions.size()); 
+    }
     for(int i = 0; i < vertexPositions.size(); i++)
     {
         m.verts.emplace_back(i); //creates a vertex object with the ith id.
@@ -389,7 +397,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
     //from this we will form the halfedges and faces. this map will store the index of the halfedge between the two vertices.
     map<pair<int,int>, int> halfEdgeMap;
     //the map stores the location of the half edge corresponding to these vertices in the direction of first to second.
-    set<ivec2> edges;
+    set<pair<int,int>> edges;
     m.faces = vector<Face>(faces.size());
     int total_halfedges = 0;
 
@@ -414,7 +422,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
                 halfEdgeMap[{v1,v2}] = m.halfEdges.size() - 1;
             }
             m.halfEdges[halfEdgeMap[{v1,v2}]].face = &m.faces[i];
-            m.halfEdges[halfEdgeMap[{v1,v2}]].head = &m.verts[v1];
+            m.halfEdges[halfEdgeMap[{v1,v2}]].head = &m.verts[v2];
             
             //we also create its twin if it doesn't exist yet. With no face initially.
             if(halfEdgeMap.count({v2,v1}) == 0)
@@ -422,12 +430,18 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
                 //we create it if it doesn't exist. EZ
                 m.halfEdges.emplace_back(nullptr, nullptr, &m.verts[v1], nullptr);
                 halfEdgeMap[{v2,v1}] = m.halfEdges.size() - 1;
-            }            
+            }  
+            
+            //finally update the set of edges.
+            edges.insert({std::min(v1,v2), std::max(v1,v2)});
         }
+    }
 
         //after this we have the halfEdges, verts, faces vector all ready without any further size changes.
+        cout << "faces size: " << faces.size() << endl;
         for(int i = 0; i < faces.size(); i++)
         {
+            cout << " on face: " << i << endl;
             //now we can assign the next and pair pointers for all the halfEdges.
             vector<int> face = faces[i];
             face.push_back(face[0]); face.push_back(face[1]); 
@@ -440,14 +454,22 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
                 int pairedHalfEdge = halfEdgeMap[{v2, v1}];
                 m.halfEdges[curHalfEdge].next = &m.halfEdges[nextHalfEdge];
                 m.halfEdges[curHalfEdge].pair = &m.halfEdges[pairedHalfEdge];
+                m.halfEdges[pairedHalfEdge].pair = &m.halfEdges[curHalfEdge];
                 m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
-            
-                m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge];
+
+                m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge]; //v1 points to a half edge that points away from it.
+                // cout << "vertex " << v1 << " points to halfedge " << curHalfEdge << " : {" << v1 << "," << v2 << "}" << endl;
             }
 
             //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
             m.faces[i].halfEdge = &m.halfEdges[halfEdgeMap[{face[0], face[1]}]];
+            // cout << "face " << i << " points to halfedge " << halfEdgeMap[{face[0], face[1]}] << " : {" << face[0] << "," << face[1] << "}" << endl;
         }
-    }
-
+    
+        //finally set the edges vector as well.
+        for(auto edge : edges)
+        {
+            m.edges.push_back(ivec2(edge.first, edge.second));
+        }
+    
 }

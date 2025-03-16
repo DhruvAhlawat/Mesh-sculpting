@@ -8,7 +8,6 @@ void Mesh::triangulateMesh()
     // we iterate over all the existing faces in our mesh.
     for(int i = 0; i < this->faces.size(); i++)
     {
-        cout << "face: " << i << endl;
         //else we will break it up into smaller pieces using the first vertex as the common vertex. 
         // triangle fanning procedure.
         HalfEdge *he = faces[i].halfEdge;
@@ -25,7 +24,6 @@ void Mesh::triangulateMesh()
             he = he->next;
             newFace[2] = he->head->id;
             newTriangles.push_back(newFace);
-            cout << "   triangle verts: " << newFace[0] << " " << newFace[1] << " " << newFace[2] << endl;
         }
     }
     this->triangles = newTriangles; //updates the triangles array for us.
@@ -316,9 +314,6 @@ Mesh loadOBJ(const std::string& filename) {
             //     mesh.edges.emplace_back(faceIndices[i], faceIndices[(i + 1) % faceIndices.size()]);
             // }
         }
-
-
-
     }
 
     file.close();
@@ -330,7 +325,7 @@ Mesh loadOBJ(const std::string& filename) {
 
 void Mesh::recomputeVertexNormals() 
 {
-    // Reset normals
+    cout << "recomputing vertex normals" << endl;
     if(triangles.size() == 0)
     {
         cout << "triangulating mesh" << endl;
@@ -339,14 +334,12 @@ void Mesh::recomputeVertexNormals()
     normals.assign(vertexPositions.size(), glm::vec3(0.0f));
     // Compute face normals and accumulate into vertex normals
     for (const auto& tri : triangles) {
-        // cout << "triangle " << tri.x << " " << tri.y << " " << tri.z << endl;
         glm::vec3 v0 = vertexPositions[tri.x];
         glm::vec3 v1 = vertexPositions[tri.y];
         glm::vec3 v2 = vertexPositions[tri.z];
 
         // Compute face normal using cross product
         glm::vec3 normal = (glm::cross(v1 - v0, v2 - v0));
-        // cout << "   normal: " << normal.x << " " << normal.y << " " << normal.z << endl;
         // Accumulate normal weighted by face area
         float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
         normals[tri.x] += normal * area; 
@@ -370,24 +363,8 @@ void Mesh::recomputeVertexNormals()
 void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> normals)
 {
     m.clear();
-    //prints the inptu.
-    cout << "faces:" << endl;
-    for(int i = 0; i < faces.size(); i++)
-    {
-        cout << "face " << i << ": ";
-        for(int j = 0; j < faces[i].size(); j++)
-        {
-            cout << faces[i][j] << " ";
-        }
-        cout << endl;
-    }
-
     m.vertexPositions = vertexPositions;
     m.normals = normals;
-    if(m.normals.size() == 0)
-    {
-        m.normals = vector<vec3>(vertexPositions.size()); 
-    }
     for(int i = 0; i < vertexPositions.size(); i++)
     {
         m.verts.emplace_back(i); //creates a vertex object with the ith id.
@@ -437,39 +414,35 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
         }
     }
 
-        //after this we have the halfEdges, verts, faces vector all ready without any further size changes.
-        cout << "faces size: " << faces.size() << endl;
-        for(int i = 0; i < faces.size(); i++)
+    //after this we have the halfEdges, verts, faces vector all ready without any further size changes.
+    for(int i = 0; i < faces.size(); i++)
+    {
+        //now we can assign the next and pair pointers for all the halfEdges.
+        vector<int> face = faces[i];
+        face.push_back(face[0]); face.push_back(face[1]); 
+
+        for(int j = 0; j < face.size() - 2; j++)
         {
-            cout << " on face: " << i << endl;
-            //now we can assign the next and pair pointers for all the halfEdges.
-            vector<int> face = faces[i];
-            face.push_back(face[0]); face.push_back(face[1]); 
+            int v1 = face[j], v2 = face[j+1];
+            int curHalfEdge = halfEdgeMap[{v1,v2}];
+            int nextHalfEdge = halfEdgeMap[{v2,face[j+2]}];
+            int pairedHalfEdge = halfEdgeMap[{v2, v1}];
+            m.halfEdges[curHalfEdge].next = &m.halfEdges[nextHalfEdge];
+            m.halfEdges[curHalfEdge].pair = &m.halfEdges[pairedHalfEdge];
+            m.halfEdges[pairedHalfEdge].pair = &m.halfEdges[curHalfEdge];
+            m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
 
-            for(int j = 0; j < face.size() - 2; j++)
-            {
-                int v1 = face[j], v2 = face[j+1];
-                int curHalfEdge = halfEdgeMap[{v1,v2}];
-                int nextHalfEdge = halfEdgeMap[{v2,face[j+2]}];
-                int pairedHalfEdge = halfEdgeMap[{v2, v1}];
-                m.halfEdges[curHalfEdge].next = &m.halfEdges[nextHalfEdge];
-                m.halfEdges[curHalfEdge].pair = &m.halfEdges[pairedHalfEdge];
-                m.halfEdges[pairedHalfEdge].pair = &m.halfEdges[curHalfEdge];
-                m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
-
-                m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge]; //v1 points to a half edge that points away from it.
-                // cout << "vertex " << v1 << " points to halfedge " << curHalfEdge << " : {" << v1 << "," << v2 << "}" << endl;
-            }
-
-            //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
-            m.faces[i].halfEdge = &m.halfEdges[halfEdgeMap[{face[0], face[1]}]];
-            // cout << "face " << i << " points to halfedge " << halfEdgeMap[{face[0], face[1]}] << " : {" << face[0] << "," << face[1] << "}" << endl;
+            m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge]; //v1 points to a half edge that points away from it.
         }
+
+        //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
+        m.faces[i].halfEdge = &m.halfEdges[halfEdgeMap[{face[0], face[1]}]];
+    }
     
-        //finally set the edges vector as well.
-        for(auto edge : edges)
-        {
-            m.edges.push_back(ivec2(edge.first, edge.second));
-        }
+    //finally set the edges vector as well.
+    for(auto edge : edges)
+    {
+        m.edges.push_back(ivec2(edge.first, edge.second));
+    }
     
 }

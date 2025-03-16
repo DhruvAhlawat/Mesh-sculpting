@@ -89,9 +89,7 @@ class Mesh
     std::vector<Face> faces;
     //triangulates the mesh for rasterization. 
     void triangulateMesh();
-    void recalculateNormals();
     void recomputeVertexNormals();
-    void getMeshObj();
     void clear(); //refreshes the mesh by clearing all the vectors.
     // mesh(int total_verts);
 };

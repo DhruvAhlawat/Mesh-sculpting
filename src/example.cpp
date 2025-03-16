@@ -101,12 +101,10 @@ int main() {
     // mesh sq = createGrid(40, 40);
     // mesh sq = generateSphere(40, 40);
     // mesh sq = generateCube(10,10,10);
-    mesh sq = loadOBJ("meshes/bunny_1k.obj");
+    Mesh sq = loadOBJ("meshes/bunny_1k.obj");
     sq.triangulateMesh(); //creates the triangles.
-    recomputeVertexNormals(sq);
-
+    // recomputeVertexNormals(sq);
     v.setMesh(sq.vertexPositions.size(), sq.triangles.size(), sq.edges.size(), &sq.vertexPositions[0], &sq.triangles[0], &sq.edges[0], &sq.normals[0]);
     // v.setMesh(20, 10, 12, vertices, triangles, edges, normals);
-    
     v.view();
 }

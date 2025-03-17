@@ -30,7 +30,7 @@ void Mesh::triangulateMesh()
             newTriangles.push_back(newFace);
         }
     }
-    this->triangles = newTriangles; //updates the triangles array for us.
+    this->triangles = std::move(newTriangles); //updates the triangles array for us.
     //dont really need to update the edges array as the edges will remain the same on displaying
 }
 
@@ -141,8 +141,8 @@ Mesh createGrid(int m, int n) {
 
 Mesh generateSphere(int m, int n) {
     Mesh sphereMesh;
-    
-    // vertices
+
+    // Generate vertices
     for (int j = 1; j < n; j++) { // Exclude poles
         float phi = M_PI * j / n;
         for (int i = 0; i < m; i++) {
@@ -157,54 +157,59 @@ Mesh generateSphere(int m, int n) {
     // Add poles
     int northPoleIndex = sphereMesh.vertexPositions.size();
     sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
-
     int southPoleIndex = sphereMesh.vertexPositions.size();
     sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
 
-    // Generate faces and edges
-    for (int j = 0; j < n - 2; j++) { // Iterate over stacks
-        for (int i = 0; i < m; i++) { // Iterate over slices
+    vector<vector<int>> faces;
+    
+    // Middle quads (excluding poles)
+    for (int j = 0; j < n - 2; j++) { // stacks
+        for (int i = 0; i < m; i++) { // slices
             int nextI = (i + 1) % m;
             int currRow = j * m;
             int nextRow = (j + 1) * m;
 
-            // Create two triangles per quad
-            sphereMesh.triangles.emplace_back(currRow + i, nextRow + i, nextRow + nextI);
-            sphereMesh.triangles.emplace_back(currRow + i, nextRow + nextI, currRow + nextI);
-
-            // Store edges
-            sphereMesh.edges.emplace_back(currRow + i, nextRow + i);
-            sphereMesh.edges.emplace_back(nextRow + i, nextRow + nextI);
-            sphereMesh.edges.emplace_back(nextRow + nextI, currRow + nextI);
-            sphereMesh.edges.emplace_back(currRow + nextI, currRow + i);
+            // quad face, anticlockwise
+            faces.push_back({
+                currRow + i,
+                nextRow + i,
+                nextRow + nextI,
+                currRow + nextI
+            });
         }
     }
 
-    // Connect top cap
+    // Top cap (fan around north pole)
     for (int i = 0; i < m; i++) {
         int nextI = (i + 1) % m;
-        sphereMesh.triangles.emplace_back(northPoleIndex, i, nextI);
-        sphereMesh.edges.emplace_back(northPoleIndex, i);
-        sphereMesh.edges.emplace_back(i, nextI);
+        faces.push_back({
+            northPoleIndex,
+            i,
+            nextI
+        });
     }
 
-    // Connect bottom cap
+    // Bottom cap (fan around south pole)
     int bottomStart = (n - 2) * m;
     for (int i = 0; i < m; i++) {
         int nextI = (i + 1) % m;
-        sphereMesh.triangles.emplace_back(southPoleIndex, bottomStart + nextI, bottomStart + i);
-        sphereMesh.edges.emplace_back(southPoleIndex, bottomStart + nextI);
-        sphereMesh.edges.emplace_back(bottomStart + nextI, bottomStart + i);
+        faces.push_back({
+            southPoleIndex,
+            bottomStart + nextI,
+            bottomStart + i
+        });
     }
-
-    sphereMesh.normals = sphereMesh.vertexPositions;
+    auto vertpos = sphereMesh.vertexPositions;
+    getMeshFromVerts(sphereMesh, vertpos, faces);
 
     return sphereMesh;
 }
 
+
 Mesh generateCube(int m, int n, int o) {
     Mesh cubeMesh;
     std::vector<std::vector<std::vector<int>>> vertexIndices(m + 1, std::vector<std::vector<int>>(n + 1, std::vector<int>(o + 1, -1)));
+    std::vector<std::vector<int>> faces; // New faces vector
 
     // Generate vertices
     int index = 0;
@@ -222,36 +227,34 @@ Mesh generateCube(int m, int n, int o) {
 
     // Generate faces and edges
     auto addQuad = [&](int v0, int v1, int v2, int v3) {
-        cubeMesh.triangles.emplace_back(v0, v1, v2);
-        cubeMesh.triangles.emplace_back(v0, v2, v3);
-        cubeMesh.edges.emplace_back(v0, v1);
-        cubeMesh.edges.emplace_back(v1, v2);
-        cubeMesh.edges.emplace_back(v2, v3);
-        cubeMesh.edges.emplace_back(v3, v0);
+        faces.push_back({v0, v1, v2, v3});
     };
 
     // Generate faces
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            addQuad(vertexIndices[i][j][0], vertexIndices[i + 1][j][0], vertexIndices[i + 1][j + 1][0], vertexIndices[i][j + 1][0]); // -Z face
-            addQuad(vertexIndices[i][j][o], vertexIndices[i][j + 1][o], vertexIndices[i + 1][j + 1][o], vertexIndices[i + 1][j][o]); // +Z face
+            addQuad(vertexIndices[i][j][0], vertexIndices[i][j + 1][0], vertexIndices[i + 1][j + 1][0], vertexIndices[i + 1][j][0]); // +Z face
+            addQuad(vertexIndices[i][j][o], vertexIndices[i + 1][j][o], vertexIndices[i + 1][j + 1][o], vertexIndices[i][j + 1][o]); // -Z face
         }
     }
     for (int i = 0; i < m; i++) {
         for (int k = 0; k < o; k++) {
-            addQuad(vertexIndices[i][0][k], vertexIndices[i + 1][0][k], vertexIndices[i + 1][0][k + 1], vertexIndices[i][0][k + 1]); // -Y face
             addQuad(vertexIndices[i][n][k], vertexIndices[i][n][k + 1], vertexIndices[i + 1][n][k + 1], vertexIndices[i + 1][n][k]); // +Y face
+            addQuad(vertexIndices[i][0][k], vertexIndices[i + 1][0][k], vertexIndices[i + 1][0][k + 1], vertexIndices[i][0][k + 1]); // -Y face
         }
     }
     for (int j = 0; j < n; j++) {
         for (int k = 0; k < o; k++) {
-            addQuad(vertexIndices[0][j][k], vertexIndices[0][j + 1][k], vertexIndices[0][j + 1][k + 1], vertexIndices[0][j][k + 1]); // -X face
-            addQuad(vertexIndices[m][j][k], vertexIndices[m][j][k + 1], vertexIndices[m][j + 1][k + 1], vertexIndices[m][j + 1][k]); // +X face
+            addQuad(vertexIndices[0][j][k], vertexIndices[0][j][k + 1], vertexIndices[0][j + 1][k + 1], vertexIndices[0][j + 1][k]); // +X face
+            addQuad(vertexIndices[m][j][k], vertexIndices[m][j + 1][k], vertexIndices[m][j + 1][k + 1], vertexIndices[m][j][k + 1]); // -X face
         }
     }
+    auto vertpos = cubeMesh.vertexPositions;
+    getMeshFromVerts(cubeMesh, vertpos, faces);
 
     return cubeMesh;
 }
+
 
 Mesh loadOBJ(const std::string& filename) {
     Mesh mesh;

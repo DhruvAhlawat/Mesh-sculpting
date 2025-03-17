@@ -144,8 +144,8 @@ Mesh createGrid(int m, int n) {
 
 Mesh generateSphere(int m, int n) {
     Mesh sphereMesh;
-    
-    // vertices
+
+    // Generate vertices
     for (int j = 1; j < n; j++) { // Exclude poles
         float phi = M_PI * j / n;
         for (int i = 0; i < m; i++) {
@@ -160,50 +160,54 @@ Mesh generateSphere(int m, int n) {
     // Add poles
     int northPoleIndex = sphereMesh.vertexPositions.size();
     sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
-
     int southPoleIndex = sphereMesh.vertexPositions.size();
     sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
 
-    // Generate faces and edges
-    for (int j = 0; j < n - 2; j++) { // Iterate over stacks
-        for (int i = 0; i < m; i++) { // Iterate over slices
+    vector<vector<int>> faces;
+    
+    // Middle quads (excluding poles)
+    for (int j = 0; j < n - 2; j++) { // stacks
+        for (int i = 0; i < m; i++) { // slices
             int nextI = (i + 1) % m;
             int currRow = j * m;
             int nextRow = (j + 1) * m;
 
-            // Create two triangles per quad
-            sphereMesh.triangles.emplace_back(currRow + i, nextRow + i, nextRow + nextI);
-            sphereMesh.triangles.emplace_back(currRow + i, nextRow + nextI, currRow + nextI);
-
-            // Store edges
-            sphereMesh.edges.emplace_back(currRow + i, nextRow + i);
-            sphereMesh.edges.emplace_back(nextRow + i, nextRow + nextI);
-            sphereMesh.edges.emplace_back(nextRow + nextI, currRow + nextI);
-            sphereMesh.edges.emplace_back(currRow + nextI, currRow + i);
+            // quad face, anticlockwise
+            faces.push_back({
+                currRow + i,
+                nextRow + i,
+                nextRow + nextI,
+                currRow + nextI
+            });
         }
     }
 
-    // Connect top cap
+    // Top cap (fan around north pole)
     for (int i = 0; i < m; i++) {
         int nextI = (i + 1) % m;
-        sphereMesh.triangles.emplace_back(northPoleIndex, i, nextI);
-        sphereMesh.edges.emplace_back(northPoleIndex, i);
-        sphereMesh.edges.emplace_back(i, nextI);
+        faces.push_back({
+            northPoleIndex,
+            i,
+            nextI
+        });
     }
 
-    // Connect bottom cap
+    // Bottom cap (fan around south pole)
     int bottomStart = (n - 2) * m;
     for (int i = 0; i < m; i++) {
         int nextI = (i + 1) % m;
-        sphereMesh.triangles.emplace_back(southPoleIndex, bottomStart + nextI, bottomStart + i);
-        sphereMesh.edges.emplace_back(southPoleIndex, bottomStart + nextI);
-        sphereMesh.edges.emplace_back(bottomStart + nextI, bottomStart + i);
+        faces.push_back({
+            southPoleIndex,
+            bottomStart + nextI,
+            bottomStart + i
+        });
     }
-
-    sphereMesh.normals = sphereMesh.vertexPositions;
+    auto vertpos = sphereMesh.vertexPositions;
+    getMeshFromVerts(sphereMesh, vertpos, faces);
 
     return sphereMesh;
 }
+
 
 Mesh generateCube(int m, int n, int o) {
     Mesh cubeMesh;

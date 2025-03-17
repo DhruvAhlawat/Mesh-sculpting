@@ -179,7 +179,7 @@ Mesh generateSphere(int m, int n) {
     sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
 
     vector<vector<int>> faces;
-    
+
     // Middle quads (excluding poles)
     for (int j = 0; j < n - 2; j++) { // stacks
         for (int i = 0; i < m; i++) { // slices
@@ -237,8 +237,10 @@ Mesh generateCube(int m, int n, int o) {
             float y = -0.5f + j / float(n);
             for (int k = 0; k <= o; k++) {
                 float z = -0.5f + k / float(o);
+                if (i==0 || i==m || j==0 || j==n || k==0 || k==o){
                 cubeMesh.vertexPositions.emplace_back(x, y, z);
                 vertexIndices[i][j][k] = index++;
+                }
             }
         }
     }
@@ -546,6 +548,122 @@ void umbrellaSmooth(Mesh &m, float lambda, int iterations)
     }
 }
 
+void catmullClarkSubdivision(Mesh &m) {
+    std::vector<vec3> outVerts;
+    std::vector<std::vector<int>> outFaces;
+
+    std::unordered_map<Face*, vec3> facePoints;
+    std::unordered_map<HalfEdge*, vec3> edgePoints;
+    std::unordered_map<int, vec3> newVertexPositions;
+
+    // Step 1: Face points
+    for (int i = 0; i < m.faces.size(); ++i) {
+        Face &face = m.faces[i];
+        if (!face.halfEdge) continue;
+        vec3 fp(0.0f);
+        HalfEdge *start = face.halfEdge;
+        HalfEdge *he = start;
+        int count = 0;
+        do {
+            fp += m.vertexPositions[he->head->id];
+            he = he->next;
+            count++;
+        } while (he != start);
+        facePoints[&face] = fp / float(count);
+    }
+
+    // Step 2: Edge points
+    for (int i = 0; i < m.halfEdges.size(); ++i) {
+        HalfEdge &he = m.halfEdges[i];
+        if (edgePoints.count(&he)) continue; // Skip if already processed
+        vec3 p1 = m.vertexPositions[he.head->id];
+        vec3 p2 = m.vertexPositions[he.pair->head->id];
+        vec3 ep = p1 + p2;
+        if (he.face && he.pair->face) {
+            ep += facePoints[he.face] + facePoints[he.pair->face];
+            ep /= 4.0f;
+        } else {
+            ep /= 2.0f;
+        }
+        edgePoints[&he] = ep;
+        edgePoints[he.pair] = ep;
+    }
+
+    // Step 3: New vertex positions
+    for (int i = 0; i < m.verts.size(); ++i) {
+        Vertex &v = m.verts[i];
+        vec3 Q(0.0f);
+        vec3 R(0.0f);
+        vec3 P = m.vertexPositions[v.id];
+        auto neighbours = getVertexNeighbours(m, v.id);
+        int n = neighbours.size();
+        if (n == 0) { newVertexPositions[v.id] = P; continue; }
+
+        // Q = average of neighboring face points
+        HalfEdge *he = v.halfEdge;
+        do {
+            Q += facePoints[he->face];
+            he = prev(he)->pair;
+        } while (he && he != v.halfEdge);
+        Q /= float(n);
+
+        // R = average of midpoints of surrounding edges
+        for (int nb : neighbours) {
+            R += 0.5f * (P + m.vertexPositions[nb]);
+        }
+        R /= float(n);
+
+        newVertexPositions[v.id] = (Q + 2.0f * R + (float(n) - 3.0f) * P) / float(n);
+    }
+
+    // Step 4: Output
+    outVerts.clear();
+    outFaces.clear();
+
+    // Maps for bookkeeping
+    std::map<void*, int> facePointIds;
+    std::map<void*, int> edgePointIds;
+    std::map<int, int> oldVertexNewIds;
+
+    // Add face points
+    for (auto &pair : facePoints) {
+        facePointIds[pair.first] = outVerts.size();
+        outVerts.push_back(pair.second);
+    }
+
+    // Add edge points
+    for (auto &pair : edgePoints) {
+        if (edgePointIds.count(pair.first)) continue;
+        edgePointIds[pair.first] = outVerts.size();
+        edgePointIds[pair.first->pair] = edgePointIds[pair.first];
+        outVerts.push_back(pair.second);
+    }
+
+    // Add repositioned old verts
+    for (int i = 0; i < m.vertexPositions.size(); ++i) {
+        oldVertexNewIds[i] = outVerts.size();
+        outVerts.push_back(newVertexPositions[i]);
+    }
+
+    // Step 5: Build faces (anti-clockwise quads)
+    for (int i = 0; i < m.faces.size(); ++i) {
+        Face &face = m.faces[i];
+        HalfEdge *start = face.halfEdge;
+        HalfEdge *he = start;
+        do {
+            std::vector<int> quad;
+            quad.push_back(oldVertexNewIds[he->head->id]); // old vertex
+            quad.push_back(edgePointIds[he]);
+            quad.push_back(facePointIds[&face]);
+            quad.push_back(edgePointIds[prev(he)]);
+            if(prev(he)==nullptr) cout << "prev is null" << endl;
+            outFaces.push_back(quad);
+            he = he->next;
+        } while (he != start);
+    }
+    getMeshFromVerts(m, outVerts, outFaces);
+    std::cout << "Subdivision done: " << outVerts.size() << " vertices, " << outFaces.size() << " quads.\n";
+}
 void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
 {
     if(f == nullptr)

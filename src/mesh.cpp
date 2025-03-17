@@ -26,7 +26,7 @@ void Mesh::triangulateMesh()
             newTriangles.push_back(newFace);
         }
     }
-    this->triangles = newTriangles; //updates the triangles array for us.
+    this->triangles = std::move(newTriangles); //updates the triangles array for us.
     //dont really need to update the edges array as the edges will remain the same on displaying
 }
 
@@ -252,6 +252,21 @@ Mesh generateCube(int m, int n, int o) {
             addQuad(vertexIndices[m][j][k], vertexIndices[m][j][k + 1], vertexIndices[m][j + 1][k + 1], vertexIndices[m][j + 1][k]); // +X face
         }
     }
+
+    vector<vector<int>> faces;
+    vector<int> v = {0, m*(n+1)*(o+1), m*(n+1)*(o+1) +n*(o+1), n*(o+1),
+                o, m*(n+1)*(o+1)+o, m*(n+1)*(o+1) + n*(o+1) + o, n*(o+1)+o};
+
+    faces.push_back({v[0], v[1], v[5], v[4]});
+    faces.push_back({v[0], v[4], v[7], v[3]});
+    faces.push_back({v[0], v[3], v[2], v[1]});
+    faces.push_back({v[4], v[5], v[6], v[7]});
+    faces.push_back({v[3], v[7], v[6], v[2]});
+    faces.push_back({v[1], v[2], v[6], v[5]});
+
+    vector<vec3> vertpos = cubeMesh.vertexPositions;
+
+    getMeshFromVerts(cubeMesh, vertpos, faces);
 
     return cubeMesh;
 }

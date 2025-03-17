@@ -362,7 +362,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
     m.normals = normals;
     for(int i = 0; i < vertexPositions.size(); i++)
     {
-        m.verts.emplace_back(i); //creates a vertex object with the ith id.
+        m.verts.push_back(Vertex(i)); //creates a vertex object with the ith id.
     }  // no pointers to consider yet so can use emplaceback. 
 
     //now we will form an edge mapping. 
@@ -370,7 +370,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
     map<pair<int,int>, int> halfEdgeMap;
     //the map stores the location of the half edge corresponding to these vertices in the direction of first to second.
     set<pair<int,int>> edges;
-    m.faces = vector<Face>(faces.size());
+    m.faces = vectorMap<Face>(faces.size());
     int total_halfedges = 0;
 
     //we will iterate over the faces and create the halfedges and faces and only assign the face and vertex pointers.
@@ -390,7 +390,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
             {
                 //create a new halfedge here.
                 //only apply the vert and faces pointers for now.
-                m.halfEdges.emplace_back(nullptr, nullptr, &m.verts[v2], &m.faces[i]);
+                m.halfEdges.push_back(HalfEdge(nullptr, nullptr, &m.verts[v2], &m.faces[i]));
                 halfEdgeMap[{v1,v2}] = m.halfEdges.size() - 1;
             }
             m.halfEdges[halfEdgeMap[{v1,v2}]].face = &m.faces[i];
@@ -400,7 +400,7 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
             if(halfEdgeMap.count({v2,v1}) == 0)
             {
                 //we create it if it doesn't exist. EZ
-                m.halfEdges.emplace_back(nullptr, nullptr, &m.verts[v1], nullptr);
+                m.halfEdges.push_back(HalfEdge(nullptr, nullptr, &m.verts[v1], nullptr));
                 halfEdgeMap[{v2,v1}] = m.halfEdges.size() - 1;
             }  
             

@@ -172,5 +172,5 @@ Mesh generateCube(int m, int n, int o);
 Mesh loadOBJ(const std::string& filename);
 void getMeshFromVerts(Mesh &m, std::vector<vec3> &vertexPositions, std::vector<std::vector<int>> &faces, std::vector<vec3> normals = {});
 void umbrellaSmooth(Mesh &m, float lambda, int iterations = 1);
-HalfEdge *prev(HalfEdge *he);
-// void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);
+HalfEdge *prev(HalfEdge *he);   // returns the previous half-edge in the face
+void catmullClarkSubdivision(Mesh &m);

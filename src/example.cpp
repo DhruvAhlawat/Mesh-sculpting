@@ -101,8 +101,8 @@ int main() {
     // mesh sq = createGrid(40, 40);
     // mesh sq = generateSphere(40, 40);
     // mesh sq = generateCube(10,10,10);
-    // Mesh sq = loadOBJ("meshes/cube.obj");
-    Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
+    Mesh sq = loadOBJ("meshes/cube.obj");
+    // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
     sq.triangulateMesh(); // required for rendering
     if(sq.normals.size() == 0)
         sq.recomputeVertexNormals();

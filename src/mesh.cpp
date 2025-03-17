@@ -41,16 +41,9 @@ void Mesh::clear()
     faces.clear();
 }
 
-
 vec3 spherePos(float theta, float phi)
 {
     return vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi));
-}
-
-
-void createTriangle(Vertex v1, Vertex v2, Vertex v3)
-{
-
 }
 
 Mesh createGrid(int m, int n) {
@@ -512,3 +505,101 @@ void UmbrellaSmooth(Mesh &m, float lambda, int iterations)
     }
 }
 
+void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr)
+{
+    if(f == nullptr)
+    {
+        f = &m.faces[faceid];
+    }
+    HalfEdge *he = f->halfEdge;
+
+    //instead of doing it in a complicated way dependent on implementation. Lets bruteforce and use a map to remember all the new creations 
+    //and then finally join them together using our halfedge knowledge.
+    map<pair<int,int>, int> halfEdges;
+    vector<int> newVerts;
+    vector<int> newFaces;
+
+    m.verts.push_back(Vertex(m.verts.size()));
+    m.vertexPositions.push_back(m.vertexPositions[he->pair->head->id]);
+    newVerts.push_back(m.verts.size() - 1);
+
+    Vertex *back = he->pair->head;
+    Vertex *backDup = &m.verts[m.verts.size() - 1]; //duplicated this beforehand.
+
+    //and we also create a halfedge that points from back to backDup here.
+    HalfEdge *backToBackDup = &m.halfEdges.push_back(HalfEdge());
+    backToBackDup->head = backDup;
+
+    Vertex *startBack = back, *startBackDup = backDup;
+    HalfEdge *startBackToBackDup = backToBackDup;
+
+    do
+    {
+        Vertex *vOg = he->head;
+        HalfEdge *ogPair = he->pair; //the original pair of this halfedge. 
+        Vertex *vDup; 
+        if(he->next != f->halfEdge)
+        {
+            m.verts.push_back(Vertex(m.verts.size()));
+            m.vertexPositions.push_back(m.vertexPositions[vOg->id]);
+            newVerts.push_back(m.verts.size() - 1);
+            vDup = &m.verts[m.verts.size() - 1];
+        }
+        else
+        {
+            //else we are on the last halfEdge. in this case no duplication is necessary as we already have vertices duplicated originally.
+            vDup = startBackDup;
+            vOg = startBack; //although he->head should give the same results imo
+        }
+
+
+        HalfEdge *h1 = &m.halfEdges.push_back(HalfEdge());
+        HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
+        HalfEdge *h3 = &m.halfEdges.push_back(HalfEdge());
+        HalfEdge *h4; 
+        if(he->next != f->halfEdge)
+        { h4 = &m.halfEdges.push_back(HalfEdge()); }
+        else
+        { h4 = startBackToBackDup; }
+        
+        //now we will make a new face that goes from backDup to vDup to vOg to backVert to backDup.
+        Face *newFace = &m.faces.push_back(4); //a new quad face.
+        newFace->halfEdge = h1; //pointing to the top halfedge.
+
+        he->head = vDup; //pointing to the duplicate now.
+        he->pair = h1; 
+        
+        h1->head = backDup; h1->face = newFace; h1->pair = he; h1->next = h2;
+
+        h2->head = back; h2->face = newFace; h2->pair = backToBackDup; h2->next = h3; 
+        backToBackDup->pair = h2; //gotta set this up. Can do it later too using a map, but this is possible so its fine.
+
+        h3->head = vOg; h3->face = newFace; h3->pair = ogPair; h3->next = h4;
+
+        h4->head = vDup; h4->face = newFace; h4->next = h1; //h4's pair is not yet set, or in the case of startBackToBackDup, already set beforehand.
+
+        backToBackDup = h4; // to set its pair later in the next iteration.
+        back = vOg;
+        backDup = vDup;
+
+        he = he->next;
+    } while(he != f->halfEdge);
+    
+
+    //after this operation we can move it all a certain amount. Also gotta calculate its normal.
+    if(direction == vec3(0.0f))
+    {
+        vec3 originpos = m.vertexPositions[newVerts[0]];
+        for(int i = 1; i < newVerts.size() - 1; i++)
+        {
+            direction += (cross(m.vertexPositions[newVerts[i]] - originpos, m.vertexPositions[newVerts[i+1]] - originpos));
+        }
+    }
+    direction = normalize(direction); //always normalize first.
+
+    for(int i = 0; i < newVerts.size(); i++)
+    {
+        //update the position of all the vertices.
+        m.vertexPositions[newVerts[i]] += offset * direction;
+    }
+}

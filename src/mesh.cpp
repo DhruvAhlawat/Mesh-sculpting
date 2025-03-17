@@ -226,7 +226,6 @@ Mesh generateCube(int m, int n, int o) {
 
     // Generate faces and edges
     auto addQuad = [&](int v0, int v1, int v2, int v3) {
-        cout<<v0<<" "<<v1<<" "<<v2<<" "<<v3<<endl;
         faces.push_back({v0, v1, v2, v3});
     };
 

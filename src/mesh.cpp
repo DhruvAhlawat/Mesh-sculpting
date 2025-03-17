@@ -11,6 +11,10 @@ void Mesh::triangulateMesh()
         //else we will break it up into smaller pieces using the first vertex as the common vertex. 
         // triangle fanning procedure.
         HalfEdge *he = faces[i].halfEdge;
+        if(he == nullptr)
+        {
+            cout << "NULLPTR ENCOUNTERED for face: " << i << endl;
+        }
         int commonVert = he->head->id;
         he = he->next;
         //we will need to cover 2 faces at once and assign the newly created halfedges as their respective pairs.
@@ -505,7 +509,7 @@ void UmbrellaSmooth(Mesh &m, float lambda, int iterations)
     }
 }
 
-void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr)
+void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
 {
     if(f == nullptr)
     {
@@ -552,7 +556,8 @@ void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f)
             vOg = startBack; //although he->head should give the same results imo
         }
 
-
+        m.edges.push_back({std::min(vDup->id, backDup->id), std::max(vDup->id, backDup->id)});
+        m.edges.push_back({std::min(vDup->id, vOg->id), std::max(vDup->id, vOg->id)});
         HalfEdge *h1 = &m.halfEdges.push_back(HalfEdge());
         HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
         HalfEdge *h3 = &m.halfEdges.push_back(HalfEdge());
@@ -565,7 +570,6 @@ void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f)
         //now we will make a new face that goes from backDup to vDup to vOg to backVert to backDup.
         Face *newFace = &m.faces.push_back(4); //a new quad face.
         newFace->halfEdge = h1; //pointing to the top halfedge.
-
         he->head = vDup; //pointing to the duplicate now.
         he->pair = h1; 
         
@@ -582,6 +586,7 @@ void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f)
         back = vOg;
         backDup = vDup;
 
+
         he = he->next;
     } while(he != f->halfEdge);
     
@@ -596,7 +601,6 @@ void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f)
         }
     }
     direction = normalize(direction); //always normalize first.
-
     for(int i = 0; i < newVerts.size(); i++)
     {
         //update the position of all the vertices.

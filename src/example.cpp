@@ -102,11 +102,12 @@ int main() {
     // mesh sq = generateSphere(40, 40);
     // mesh sq = generateCube(10,10,10);
     Mesh sq = loadOBJ("meshes/cube.obj");
-    // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
+    extrude(sq, 0.5, 0);
     sq.triangulateMesh(); // required for rendering
+    // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
+
     if(sq.normals.size() == 0)
         sq.recomputeVertexNormals();
-
     std::cout << "Mesh loaded" << std::endl;
     std::cout << "Vertices: " << sq.vertexPositions.size() << std::endl;
     std::cout << "Triangles: " << sq.triangles.size() << std::endl;

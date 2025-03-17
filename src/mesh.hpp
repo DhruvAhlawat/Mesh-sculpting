@@ -34,7 +34,7 @@ class vectorMap //class to mimic vector while retaining the pointers consistentl
     {
         data[tail] = val;
         tail++;
-        return data[tail]; //also returning its reference. 
+        return data[tail-1]; //also returning its reference. 
     }
 
     T& operator[](int index)
@@ -53,11 +53,6 @@ class vectorMap //class to mimic vector while retaining the pointers consistentl
     {
         data.clear();
         tail = 0;
-    }
-
-    void reserve(int size)
-    {
-        data.reserve(size);
     }
 
     void resize(int size)
@@ -173,4 +168,6 @@ Mesh loadOBJ(const std::string& filename);
 void getMeshFromVerts(Mesh &m, std::vector<vec3> &vertexPositions, std::vector<std::vector<int>> &faces, std::vector<vec3> normals = {});
 void umbrellaSmooth(Mesh &m, float lambda, int iterations = 1);
 HalfEdge *prev(HalfEdge *he);
+
+void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr);
 // void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);

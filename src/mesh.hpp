@@ -8,8 +8,12 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <random>
 
 using namespace glm;
+
+
+glm::vec3 randomVec3(float stddev = 1);
 
 template <class T>
 class vectorMap //class to mimic vector while retaining the pointers consistently.
@@ -169,5 +173,7 @@ void getMeshFromVerts(Mesh &m, std::vector<vec3> &vertexPositions, std::vector<s
 void umbrellaSmooth(Mesh &m, float lambda, int iterations = 1);
 HalfEdge *prev(HalfEdge *he);
 
+
+void addNoise(Mesh &m);
 void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr);
 // void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces);

@@ -1,6 +1,24 @@
 #include "mesh.hpp"
 using namespace std;
 
+
+glm::vec3 randomVec3(float stddev) 
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::normal_distribution<float> dist(0.0f, stddev); // Mean = 0, Stddev = 1
+
+    return glm::vec3(dist(gen), dist(gen), dist(gen));
+}
+
+void addNoise(Mesh &m)
+{
+    for(int i = 0; i < m.vertexPositions.size(); i++)
+    {
+        m.vertexPositions[i] += randomVec3(0.02);
+    }
+}
+
 void Mesh::triangulateMesh()
 {
     //will require us to create more edges and hence more faces as well. so the current faces and edges array will have to be completely refreshed.
@@ -226,7 +244,9 @@ Mesh generateCube(int m, int n, int o) {
     }
 
     // Generate faces and edges
-    auto addQuad = [&](int v0, int v1, int v2, int v3) {
+    auto addQuad = [&](int v0, int v1, int v2, int v3) 
+    {
+        cout << v0 << ", " << v1  << ", " << v2 << ", " << v3 << endl;
         faces.push_back({v0, v1, v2, v3});
     };
 
@@ -428,6 +448,8 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
             m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
 
             m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge]; //v1 points to a half edge that points away from it.
+            if(v1 == 13)
+                cout << "vertex " << v1 << " points now to HalfEdge: " << curHalfEdge << " ({" << v1 << ", " << v2 << "})" << endl;
         }
 
         //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
@@ -459,16 +481,24 @@ HalfEdge *prev(HalfEdge *he)
 vector<int> getVertexNeighbours(Mesh &m, int vid)
 {
     vector<int> neighbours;
+    // cout << "   trying to find neighbours of " << vid << endl;
     HalfEdge *he = m.verts[vid].halfEdge;
+    if(he == nullptr)
+    {
+        cout << "NULLPTR FOUND HE" << endl;
+    }
     do
     {
         neighbours.push_back(he->head->id);
         he = he->pair->next;
+        // cout << "going to next" << endl;
     } while (he != nullptr && he != m.verts[vid].halfEdge);
 
     //now incase of vertices present at a boundary of a mesh. The above will not always capture all the neighbours.
     //so we need to go check the previous vertices as well.
+    // cout << "trying to get prev" << endl;
     he = prev(m.verts[vid].halfEdge); 
+    // cout << "got prev" << endl;
     if(he == nullptr) return neighbours;
     //first we check if we have a boundary vertex by checking for the presence of this vertex in the neighbours list at the end.
     if(neighbours[neighbours.size() - 1] == he->pair->head->id)
@@ -477,6 +507,7 @@ vector<int> getVertexNeighbours(Mesh &m, int vid)
         return neighbours;
     }
 
+    // cout << "prev didnt match. " << endl;
     //otherwise we add all the vertices present in the opposite order frmo this halfedge as well.
     he = he->pair;
     do
@@ -488,20 +519,22 @@ vector<int> getVertexNeighbours(Mesh &m, int vid)
     return neighbours;
 }
 
-void UmbrellaSmooth(Mesh &m, float lambda, int iterations)
+void umbrellaSmooth(Mesh &m, float lambda, int iterations)
 {
+    // getVertexNeighbours(m, 13);
     for(int iter = 0; iter < iterations; iter++)
     {
         vector<vec3> deltas(m.verts.size(), vec3(0.0f));
-        for(int i = 0; i < m.verts.size(); i++)
+        for(int i = 0; i < m.verts.size() - 1; i++)
         {
+            // cout << "doing vert " << i << endl;
             Vertex v = m.verts[i];
             vector<int> neighbours = getVertexNeighbours(m, i);
             for(int j = 0; j < neighbours.size(); j++)
             {
-                deltas[i] += (m.vertexPositions[neighbours[j]] - m.vertexPositions[v.id]);
+                deltas.at(i) += (m.vertexPositions.at(neighbours.at(j)) - m.vertexPositions.at(v.id));
             }
-            deltas[i] /= neighbours.size();
+            deltas.at(i) /= neighbours.size();
         }
 
         //then we update the positions by lambda * delta
@@ -509,6 +542,7 @@ void UmbrellaSmooth(Mesh &m, float lambda, int iterations)
         {
             m.vertexPositions[i] += lambda * deltas[i];
         }
+        // cout << "iteration done: " << iter << endl;
     }
 }
 

@@ -104,12 +104,10 @@ int main() {
     // Mesh sq = loadOBJ("meshes/cube.obj");
     Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
     
-    for (int i = 0; i < 3; i++) {
-    catmullClarkSubdivision(sq);
+    catmullClarkSubdivision(sq,2);
     sq.triangulateMesh(); // required for rendering
     if(sq.normals.size() == 0)
         sq.recomputeVertexNormals();
-    }
     std::cout << "Mesh loaded" << std::endl;
     std::cout << "Vertices: " << sq.vertexPositions.size() << std::endl;
     std::cout << "Triangles: " << sq.triangles.size() << std::endl;

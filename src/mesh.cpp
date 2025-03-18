@@ -1,5 +1,4 @@
 #include "mesh.hpp"
-using namespace std;
 
 
 glm::vec3 randomVec3(float stddev) 
@@ -11,12 +10,108 @@ glm::vec3 randomVec3(float stddev)
     return glm::vec3(dist(gen), dist(gen), dist(gen));
 }
 
-void addNoise(Mesh &m)
+void addNoise(Mesh &m, float threshold)
 {
     for(int i = 0; i < m.vertexPositions.size(); i++)
     {
-        m.vertexPositions[i] += randomVec3(0.02);
+        m.vertexPositions[i] += randomVec3(threshold);
     }
+}
+
+
+
+// Clamps a value between min and max
+float clampVal(float x, float minVal, float maxVal) {
+    return std::max(minVal, std::min(maxVal, x));
+}
+
+// Computes squared distance from a point to a line segment
+float pointToSegmentSq(const vec3& p, const vec3& a, const vec3& b) {
+    vec3 ab = b - a;
+    vec3 ap = p - a;
+    float abLenSq = dot(ab, ab);
+    
+    if (abLenSq == 0.0f) return dot(ap, ap); // Degenerate segment (same point)
+
+    float t = clampVal(dot(ap, ab) / abLenSq, 0.0f, 1.0f);
+    vec3 closest = a + t * ab;
+    return dot(p - closest, p - closest);
+}
+
+// Computes squared distance from a point to a triangle
+float pointToTriSq(const vec3& p, const vec3& a, const vec3& b, const vec3& c) {
+    vec3 ab = b - a, ac = c - a;
+    vec3 normal = cross(ab, ac);
+    float normLenSq = dot(normal, normal);
+
+    if (normLenSq == 0.0f) { 
+        // Degenerate triangle (collinear points), return min edge distance
+        return std::min(
+            pointToSegmentSq(p, a, b),
+            std::min(pointToSegmentSq(p, a, c),
+            pointToSegmentSq(p, b, c))
+        );
+    }
+
+    normal = normalize(normal); // Normalize normal
+
+    // Project point onto triangle plane
+    float d = dot(normal, a);
+    vec3 proj = p - normal * (dot(normal, p) - d);
+
+    // Compute barycentric coordinates
+    vec3 v0 = c - a, v1 = b - a, v2 = proj - a;
+    float d00 = dot(v0, v0), d01 = dot(v0, v1);
+    float d11 = dot(v1, v1), d20 = dot(v2, v0), d21 = dot(v2, v1);
+    float denom = d00 * d11 - d01 * d01;
+
+    if (denom == 0.0f) { // Just in case, dont want no errors
+        // Degenerate triangle, return edge distances
+        return std::min(
+            pointToSegmentSq(p, a, b),
+            std::min(pointToSegmentSq(p, a, c),
+            pointToSegmentSq(p, b, c))
+        );
+    }
+
+    float v = (d11 * d20 - d01 * d21) / denom;
+    float w = (d00 * d21 - d01 * d20) / denom;
+    float u = 1.0f - v - w;
+
+    if (u >= 0 && v >= 0 && w >= 0) {
+        return dot(p - proj, p - proj); // Inside the triangle
+    }
+
+    // Otherwise, return min distance to edges
+    return std::min(
+        pointToSegmentSq(p, a, b),
+        std::min(pointToSegmentSq(p, a, c),
+        pointToSegmentSq(p, b, c))
+    );
+}
+
+// Finds the nearest face ID to a given point
+int Mesh::nearestFaceId(const vec3 point) {
+    if(triangles.size() == 0)
+    {
+        cout << "triangulating mesh" << endl;
+        this->triangulateMesh(); //gotta triangulate first.
+    }
+    int closestTri = -1;
+    float minDist = std::numeric_limits<float>::max();
+    // cout << "trying to "
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        ivec3 tri = triangles[i];
+
+        float distSq = pointToTriSq(point, vertexPositions[tri.x], vertexPositions[tri.y], vertexPositions[tri.z]);
+        if (distSq < minDist) {
+            minDist = distSq;
+            closestTri = i;
+        }
+    }
+
+    if (closestTri == -1) return -1; // No valid triangle found, although this should never occur. Butt just in case
+    return triangle_to_face[closestTri];
 }
 
 void Mesh::triangulateMesh()
@@ -46,6 +141,7 @@ void Mesh::triangulateMesh()
             he = he->next;
             newFace[2] = he->head->id;
             newTriangles.push_back(newFace);
+            triangle_to_face[newTriangles.size() - 1] = i; //this triangle is a part of this face. 
         }
     }
     this->triangles = std::move(newTriangles); //updates the triangles array for us.
@@ -370,12 +466,6 @@ void Mesh::recomputeVertexNormals()
     }
 }
 
-// void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> &normals)
-// {
-//     getMeshFromVerts(m, vertexPositions, faces);
-//     m.normals = normals;
-
-// }
 
 void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> normals)
 {
@@ -673,6 +763,102 @@ void catmullClarkSubdivision(Mesh &m) {
     getMeshFromVerts(m, outVerts, outFaces);
     std::cout << "Subdivision done: " << outVerts.size() << " vertices, " << outFaces.size() << " quads.\n";
 }
+
+void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<int> &faceIds)
+{
+    set<int> selectedFaces(faceIds.begin(), faceIds.end());
+    map<pair<int, int>, int> edgeCount; // Track edge occurrences
+    map<int, int> duplicatedVertices; // Original vertex -> duplicated vertex
+    vector<int> newVerts;
+    
+    // Step 1: Identify boundary edges and count occurrences
+    for (int fid : faceIds)
+    {
+        Face *f = &m.faces[fid];
+        HalfEdge *he = f->halfEdge;
+        do
+        {
+            auto edgeKey = make_pair(std::min(he->head->id, he->pair->head->id),
+                                     std::max(he->head->id, he->pair->head->id));
+            edgeCount[edgeKey]++;
+            he = he->next;
+        } while (he != f->halfEdge);
+    }
+
+    // Step 2: Duplicate boundary vertices
+    for (const auto &entry : edgeCount)
+    {
+        if (entry.second == 1) // Boundary edge (appears once in selected faces)
+        {
+            int v1 = entry.first.first;
+            int v2 = entry.first.second;
+            if (duplicatedVertices.find(v1) == duplicatedVertices.end())
+            {
+                m.verts.push_back(Vertex(m.verts.size()));
+                m.vertexPositions.push_back(m.vertexPositions[v1]);
+                duplicatedVertices[v1] = m.verts.size() - 1;
+                newVerts.push_back(m.verts.size() - 1);
+            }
+            if (duplicatedVertices.find(v2) == duplicatedVertices.end())
+            {
+                m.verts.push_back(Vertex(m.verts.size()));
+                m.vertexPositions.push_back(m.vertexPositions[v2]);
+                duplicatedVertices[v2] = m.verts.size() - 1;
+                newVerts.push_back(m.verts.size() - 1);
+            }
+        }
+    }
+
+    // Step 3: Create side faces along the boundary
+    for (const auto &entry : edgeCount)
+    {
+        if (entry.second == 1) // Only process boundary edges
+        {
+            int v1 = entry.first.first;
+            int v2 = entry.first.second;
+            int v1Dup = duplicatedVertices[v1];
+            int v2Dup = duplicatedVertices[v2];
+            
+            // Create new half-edges and a quad face for the side
+            HalfEdge *h1 = &m.halfEdges.push_back(HalfEdge());
+            HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
+            HalfEdge *h3 = &m.halfEdges.push_back(HalfEdge());
+            HalfEdge *h4 = &m.halfEdges.push_back(HalfEdge());
+            
+            Face *newFace = &m.faces.push_back(Face());
+            newFace->halfEdge = h1;
+            
+            // Connect half-edges to form a quad
+            h1->head = &m.verts[v1Dup]; h1->next = h2; h1->face = newFace;
+            h2->head = &m.verts[v2Dup]; h2->next = h3; h2->face = newFace;
+            h3->head = &m.verts[v2]; h3->next = h4; h3->face = newFace;
+            h4->head = &m.verts[v1]; h4->next = h1; h4->face = newFace;
+            
+            // Set pairing relationships
+            h1->pair = h3; h3->pair = h1;
+            h2->pair = h4; h4->pair = h2;
+        }
+    }
+
+    // Step 4: Move duplicated boundary vertices
+    if (direction == vec3(0.0f))
+    {
+        vec3 originpos = m.vertexPositions[newVerts[0]];
+        for (int i = 1; i < newVerts.size() - 1; i++)
+        {
+            direction += cross(m.vertexPositions[newVerts[i]] - originpos,
+                               m.vertexPositions[newVerts[i + 1]] - originpos);
+        }
+    }
+    direction = normalize(direction);
+    for (int vid : newVerts)
+    {
+        m.vertexPositions[vid] += offset * direction;
+    }
+}
+
+
+
 void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
 {
     if(f == nullptr)

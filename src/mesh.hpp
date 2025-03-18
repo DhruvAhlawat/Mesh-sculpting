@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cmath>
+#include <limits>
 #include <unordered_map>
 #include <set>
 #include <map>
@@ -11,7 +12,7 @@
 #include <random>
 
 using namespace glm;
-
+using namespace std;
 
 glm::vec3 randomVec3(float stddev = 1);
 
@@ -154,6 +155,7 @@ class Mesh
     std::vector<ivec3> triangles;
     std::vector<vec3> normals;
     std::vector<ivec2> edges; 
+    std::unordered_map<int, int> triangle_to_face; //for capturing the face id of the triangle.
 
     vectorMap<HalfEdge> halfEdges; // cant keep these as vectors as they have references and pointers to each others which would be messed up on r
     vectorMap<Vertex> verts;
@@ -162,6 +164,7 @@ class Mesh
     void triangulateMesh();
     void recomputeVertexNormals();
     void clear(); //refreshes the mesh by clearing all the vectors.
+    int nearestFaceId(const vec3 point);
     // mesh(int total_verts);
 };
 
@@ -173,7 +176,7 @@ void getMeshFromVerts(Mesh &m, std::vector<vec3> &vertexPositions, std::vector<s
 void umbrellaSmooth(Mesh &m, float lambda, int iterations = 1);
 HalfEdge *prev(HalfEdge *he);   
 
-void addNoise(Mesh &m);
+void addNoise(Mesh &m, float threshold = 0.02);
 void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr);
 // returns the previous half-edge in the face
 void catmullClarkSubdivision(Mesh &m);

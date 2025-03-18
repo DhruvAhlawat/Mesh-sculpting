@@ -248,7 +248,7 @@ Mesh generateCube(int m, int n, int o) {
     // Generate faces and edges
     auto addQuad = [&](int v0, int v1, int v2, int v3) 
     {
-        cout << v0 << ", " << v1  << ", " << v2 << ", " << v3 << endl;
+        // cout << v0 << ", " << v1  << ", " << v2 << ", " << v3 << endl;
         faces.push_back({v0, v1, v2, v3});
     };
 
@@ -450,8 +450,6 @@ void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>
             m.halfEdges[curHalfEdge].face = &m.faces[i]; //just for safety reassigning it.
 
             m.verts[v1].halfEdge = &m.halfEdges[curHalfEdge]; //v1 points to a half edge that points away from it.
-            if(v1 == 13)
-                cout << "vertex " << v1 << " points now to HalfEdge: " << curHalfEdge << " ({" << v1 << ", " << v2 << "})" << endl;
         }
 
         //now we also need to assign an HalfEdge to each face. so we will do it for the first 2 vertex halfedge. EZ
@@ -483,19 +481,30 @@ HalfEdge *prev(HalfEdge *he)
 vector<int> getVertexNeighbours(Mesh &m, int vid)
 {
     vector<int> neighbours;
-    // cout << "   trying to find neighbours of " << vid << endl;
+    int maxiterations = 1e2; // assuming that a a normal vertex probably doesn't have more than 100 neighbours.
+    int iter = 0;
+    cout << "   trying to find neighbours of " << vid << endl;
     HalfEdge *he = m.verts[vid].halfEdge;
+    // cout << ""
     if(he == nullptr)
     {
-        cout << "NULLPTR FOUND HE" << endl;
+        cout << "NULLPTR FOUND HalfEdge for vertex: " << vid << endl;
+        return {}; //no neighbours incase of isolated vertex.
     }
     do
     {
+        cout << he->head->id << " ";
         neighbours.push_back(he->head->id);
         he = he->pair->next;
+        iter++;
+        if(iter > maxiterations)
+        {
+            cout << "\n MAX ITERATIONS EXCEEDED IN FINDING NEIGHBOUR OF VERTEX: " << vid << endl;
+            throw "MAX ITERATIONS EXCEEDED IN FINDING NEIGHBOUR OF VERTEX";
+        }
         // cout << "going to next" << endl;
     } while (he != nullptr && he != m.verts[vid].halfEdge);
-
+    cout << endl;
     //now incase of vertices present at a boundary of a mesh. The above will not always capture all the neighbours.
     //so we need to go check the previous vertices as well.
     // cout << "trying to get prev" << endl;
@@ -527,7 +536,7 @@ void umbrellaSmooth(Mesh &m, float lambda, int iterations)
     for(int iter = 0; iter < iterations; iter++)
     {
         vector<vec3> deltas(m.verts.size(), vec3(0.0f));
-        for(int i = 0; i < m.verts.size() - 1; i++)
+        for(int i = 0; i < m.verts.size(); i++)
         {
             // cout << "doing vert " << i << endl;
             Vertex v = m.verts[i];
@@ -734,14 +743,16 @@ void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
         backToBackDup->pair = h2; //gotta set this up. Can do it later too using a map, but this is possible so its fine.
 
         h3->head = vOg; h3->face = newFace; h3->pair = ogPair; h3->next = h4;
+        ogPair->pair = h3; //also gotta update ogPair here.
 
         h4->head = vDup; h4->face = newFace; h4->next = h1; //h4's pair is not yet set, or in the case of startBackToBackDup, already set beforehand.
+
+        //the new vertex needs to point to a halfEdge that points away from it. So for vDup, the best vertex to point to is:
+        vDup->halfEdge = h1;
 
         backToBackDup = h4; // to set its pair later in the next iteration.
         back = vOg;
         backDup = vDup;
-
-
         he = he->next;
     } while(he != f->halfEdge);
     

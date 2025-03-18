@@ -99,8 +99,8 @@ int main() {
         return EXIT_FAILURE;
     }
     // mesh sq = createGrid(40, 40);
-    Mesh sq = generateSphere(10, 10);
-    // Mesh sq = generateCube(100,100,100);
+    // Mesh sq = generateSphere(10, 10);
+    Mesh sq = generateCube(1,1,1);
     // Mesh sq = loadOBJ("meshes/cube.obj");
     // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
     sq.triangulateMesh(); // required for rendering

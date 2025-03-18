@@ -18,7 +18,7 @@ void addNoise(Mesh &m, float threshold)
     }
 }
 
-
+// void revolveAndExtrude(Mesh &m, )
 
 // Clamps a value between min and max
 float clampVal(float x, float minVal, float maxVal) {
@@ -467,7 +467,6 @@ void Mesh::recomputeVertexNormals()
     }
 }
 
-
 void getMeshFromVerts(Mesh &m, vector<vec3> &vertexPositions, vector<vector<int>> &faces, vector<vec3> normals)
 {
     m.clear();
@@ -648,7 +647,6 @@ void umbrellaSmooth(Mesh &m, float lambda, int iterations)
     }
 }
 
-
 vec3 faceNormal(Mesh &m, Face *f)
 {
     HalfEdge *he = f->halfEdge;
@@ -666,6 +664,17 @@ vec3 faceNormal(Mesh &m, Face *f)
     for(int i = 1; i < vpos.size() - 1; i++)
     {
         normal += cross(vpos[i] - vpos[0], vpos[i+1] - vpos[0]);
+    }
+    normal = normalize(normal);
+    return normal;
+}
+
+vec3 groupNormalFace(Mesh &m, vector<int> faceIds)
+{
+    vec3 normal = vec3(0.0f);
+    for(int i = 0; i < faceIds.size(); i++)
+    {
+        normal += faceNormal(m, &m.faces[faceIds[i]]);
     }
     normal = normalize(normal);
     return normal;
@@ -861,8 +870,6 @@ void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direc
         m.vertexPositions[vid] += offset * direction;
     }
 }
-
-
 
 void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
 {

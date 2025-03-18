@@ -740,6 +740,7 @@ void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direc
     map<pair<int,int>, HalfEdge*> heMap; //for the new halfEdges created.
     set<HalfEdge*> boundaryHeSet(boundaryHes.begin(), boundaryHes.end()); //for quick lookup.
     set<pair<int,int>> edgesToDelete; //for the edges that we need to delete after the extrusion. (between boundary and inner faces.)
+    vector<ivec2> newEdges;
 
     // Step 2: Duplicate boundary vertices, and create boundary halfEdges.
     for (const auto &entry : edgeCount)
@@ -840,11 +841,11 @@ void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direc
                 ogNext->head = &m.verts[duplicatedVertices[ogNext->head->id]]; //now it will point to the duplicated vertex.
             }
             ogNext->pair->head = &m.verts[vDup];
-            m.edges.push_back({std::min(ogNext->head->id, vDup), std::max(ogNext->head->id, vDup)});
+            newEdges.push_back(ivec2(std::min(ogNext->head->id, vDup), std::max(ogNext->head->id, vDup)));
+            cout << "connected " << ogNext->head->id << " to " << vDup << endl;
         }
     }
  
-    vector<ivec2> newEdges;
     for(int i = 0; i < m.edges.size(); i++)
     {
         if(edgesToDelete.count({m.edges[i].x, m.edges[i].y}) == 0)

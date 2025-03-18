@@ -18,7 +18,6 @@ void addNoise(Mesh &m, float threshold)
     }
 }
 
-// void revolveAndExtrude(Mesh &m, )
 
 // Clamps a value between min and max
 float clampVal(float x, float minVal, float maxVal) {
@@ -88,6 +87,38 @@ float pointToTriSq(const vec3& p, const vec3& a, const vec3& b, const vec3& c) {
         std::min(pointToSegmentSq(p, a, c),
         pointToSegmentSq(p, b, c))
     );
+}
+
+
+vector<int> Mesh::nearestFacesToPoint(const vec3 point, int maxreturn)
+{
+    if(triangles.size() == 0)
+    {
+        cout << "triangulating mesh" << endl;
+        this->triangulateMesh(); //gotta triangulate first.
+    }
+    map<int, float> faceDistances; 
+    float minDist = std::numeric_limits<float>::max();
+
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        ivec3 tri = triangles[i];
+
+        float distSq = pointToTriSq(point, vertexPositions[tri.x], vertexPositions[tri.y], vertexPositions[tri.z]);
+        faceDistances[triangle_to_face[i]] = distSq;
+    }
+
+    vector<pair<float, int>> sortedFaces;
+    for(auto it = faceDistances.begin(); it != faceDistances.end(); it++)
+    {
+        sortedFaces.push_back(make_pair(it->second, it->first));
+    }
+    sort(sortedFaces.begin(), sortedFaces.end());
+    vector<int> finalans;
+    for(int i = 0; i < maxreturn; i++)
+    {
+        finalans.push_back(sortedFaces[i].second);
+    }
+    return finalans;
 }
 
 // Finds the nearest face ID to a given point
@@ -160,7 +191,7 @@ void Mesh::clear()
     faces.clear();
 }
 
-vec3 spherePos(float theta, float phi)
+vec3 spherePos(float phi, float theta)
 {
     return vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi));
 }
@@ -262,18 +293,23 @@ Mesh generateSphere(int m, int n) {
         float phi = M_PI * j / n;
         for (int i = 0; i < m; i++) {
             float theta = 2.0f * M_PI * i / m;
-            float x = cos(theta) * sin(phi);
-            float y = sin(theta) * sin(phi);
-            float z = cos(phi);
+            float z = cos(theta) * sin(phi);
+            float x = sin(theta) * sin(phi);
+            float y = cos(phi);
             sphereMesh.vertexPositions.emplace_back(x, y, z);
         }
     }
 
-    // Add poles
+    // // Add poles
+    // int northPoleIndex = sphereMesh.vertexPositions.size();
+    // sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
+    // int southPoleIndex = sphereMesh.vertexPositions.size();
+    // sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
+
     int northPoleIndex = sphereMesh.vertexPositions.size();
-    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, 1.0f);
+    sphereMesh.vertexPositions.emplace_back(0.0f, 1.0f, 0.0f);
     int southPoleIndex = sphereMesh.vertexPositions.size();
-    sphereMesh.vertexPositions.emplace_back(0.0f, 0.0f, -1.0f);
+    sphereMesh.vertexPositions.emplace_back(0.0f, -1.0f, 0.0f);
 
     vector<vector<int>> faces;
 
@@ -669,6 +705,31 @@ vec3 faceNormal(Mesh &m, Face *f)
     return normal;
 }
 
+void rotateFace(Mesh &m, int faceid, float theta, vec3 axis)
+{
+    Face *f = &m.faces[faceid];
+    vec3 center = vec3(0.0f);
+
+    HalfEdge *he = f->halfEdge;
+    do
+    {
+        center += m.vertexPositions[he->head->id];
+        he = he->next;
+    } while (he != f->halfEdge);
+    center /= f->num_sides;
+
+    float angle = glm::radians(theta);  // Convert degrees to radians
+    glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::normalize(axis));
+
+    he = f->halfEdge;
+    do
+    {
+        vec3 ogpos = m.vertexPositions[he->head->id];
+        m.vertexPositions[he->head->id] = glm::vec3(rotationMatrix * glm::vec4(ogpos - center, 1.0f)) + center;
+        he = he->next;
+    } while (he != f->halfEdge);
+
+}
 vec3 groupNormalFace(Mesh &m, vector<int> faceIds)
 {
     vec3 normal = vec3(0.0f);
@@ -851,7 +912,7 @@ void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direc
             }
             ogNext->pair->head = &m.verts[vDup];
             newEdges.push_back(ivec2(std::min(ogNext->head->id, vDup), std::max(ogNext->head->id, vDup)));
-            cout << "connected " << ogNext->head->id << " to " << vDup << endl;
+            // cout << "connected " << ogNext->head->id << " to " << vDup << endl;
         }
     }
  
@@ -971,6 +1032,17 @@ void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
         m.vertexPositions[newVerts[i]] += offset * direction;
     }
 }
+
+void revolveAndExtrude(Mesh &m, int faceid, float theta, float offset, int iterations, vec3 dir)
+{
+    //actually the face will remain the same.
+    for(int iter = 0; iter < iterations; iter++)
+    {
+        extrude(m, offset, faceid, dir + faceNormal(m, &m.faces[faceid]));
+        rotateFace(m, faceid, theta, vec3(0.0f, 1.0f, 0.0f));
+    }
+}
+
 
 void catmullClarkSubdivision(Mesh& m, int iterations) {
     if (iterations>1){

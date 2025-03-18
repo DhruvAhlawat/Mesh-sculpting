@@ -9,7 +9,9 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include<algorithm>
 #include <random>
+#include <glm/gtc/matrix_transform.hpp>
 
 using namespace glm;
 using namespace std;
@@ -165,6 +167,7 @@ class Mesh
     void recomputeVertexNormals();
     void clear(); //refreshes the mesh by clearing all the vectors.
     int nearestFaceId(const vec3 point);
+    vector<int> nearestFacesToPoint(const vec3 point, int maxreturn);
     // mesh(int total_verts);
 };
 
@@ -181,3 +184,4 @@ void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f)
 
 void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direction = vec3(0.0f));
 void catmullClarkSubdivision(Mesh &m, int iterations = 1);
+void revolveAndExtrude(Mesh &m, int faceid, float theta, float offset, int iterations, vec3 dir = vec3(0.0f));

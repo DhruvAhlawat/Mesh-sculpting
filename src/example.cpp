@@ -12,15 +12,20 @@ int main() {
         return EXIT_FAILURE;
     }
     // mesh sq = createGrid(40, 40);
-    Mesh sq = generateSphere(10, 10);
-    // Mesh sq = generateCube(2,2,2);
+    // Mesh sq = generateSphere(10, 10);
+    Mesh sq = generateCube(3,3,3);
     // Mesh sq = loadOBJ("meshes/cube.obj");
     // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
     
+    // all center faces
     vector<int> frontfaces;
-    frontfaces.push_back(sq.nearestFaceId(vec3(1,0,0)));
-    frontfaces.push_back(sq.nearestFaceId(vec3(1,0.4,0)));
-    extrudeMultipleFaces(sq, 0.3, frontfaces);
+    frontfaces.push_back(sq.nearestFaceId(vec3(-0.49,0,0)));
+    frontfaces.push_back(sq.nearestFaceId(vec3(0.51,0,0)));
+    // frontfaces.push_back(sq.nearestFaceId(vec3(0,0.49,0)));
+    // frontfaces.push_back(sq.nearestFaceId(vec3(0,-0.49,0)));
+    // frontfaces.push_back(sq.nearestFaceId(vec3(0,0,0.49)));
+    // frontfaces.push_back(sq.nearestFaceId(vec3(0,0,-0.49)));
+    extrudeMultipleFaces(sq, 0.1, frontfaces);
 
     sq.triangulateMesh(); // required for rendering
     if(sq.normals.size() == 0)

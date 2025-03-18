@@ -178,5 +178,6 @@ HalfEdge *prev(HalfEdge *he);
 
 void addNoise(Mesh &m, float threshold = 0.02);
 void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr);
-// returns the previous half-edge in the face
+
+void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direction = vec3(0.0f));
 void catmullClarkSubdivision(Mesh &m);

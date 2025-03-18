@@ -116,6 +116,7 @@ int Mesh::nearestFaceId(const vec3 point) {
 
 void Mesh::triangulateMesh()
 {
+    this->triangles.clear();
     //will require us to create more edges and hence more faces as well. so the current faces and edges array will have to be completely refreshed.
     vector<ivec3> newTriangles;
     // we iterate over all the existing faces in our mesh.
@@ -764,13 +765,61 @@ void catmullClarkSubdivision(Mesh &m) {
     std::cout << "Subdivision done: " << outVerts.size() << " vertices, " << outFaces.size() << " quads.\n";
 }
 
-void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<int> &faceIds)
+
+vec3 faceNormal(Mesh &m, Face *f)
 {
+    HalfEdge *he = f->halfEdge;
+    vector<vec3> vpos;
+    vpos.push_back(m.vertexPositions[he->head->id]);
+
+    he = he->next;
+    do
+    {
+        vpos.push_back(m.vertexPositions[he->head->id]);
+        he = he->next;
+    } while (he != f->halfEdge);
+    
+    vec3 normal = vec3(0.0f);
+    for(int i = 1; i < vpos.size() - 1; i++)
+    {
+        normal += cross(vpos[i] - vpos[0], vpos[i+1] - vpos[0]);
+    }
+    normal = normalize(normal);
+    return normal;
+}
+
+void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direction)
+{
+    if (direction == vec3(0.0f))
+    {
+        for(int i =0;i < faceIds.size(); i++)
+        {
+            direction += faceNormal(m, &m.faces[faceIds[i]]);
+        }
+    }
+    direction = normalize(direction);
+
+    set<int> faceSet(faceIds.begin(), faceIds.end());
+    if(faceIds.size() != faceSet.size())
+    {
+        cout << "WARNING: Duplicate faces in the input. Removing Duplicates" << endl;
+        // return;
+    }
+    faceIds = vector<int>(faceSet.begin(), faceSet.end()); //to remove duplicates
+
+
     set<int> selectedFaces(faceIds.begin(), faceIds.end());
+    set<int> verts;
+    // set<int> ;
+
     map<pair<int, int>, int> edgeCount; // Track edge occurrences
     map<int, int> duplicatedVertices; // Original vertex -> duplicated vertex
     vector<int> newVerts;
     
+    vector<HalfEdge*> boundaryHes;
+    vector<Face*> boundaryFaces;
+
+
     // Step 1: Identify boundary edges and count occurrences
     for (int fid : faceIds)
     {
@@ -778,14 +827,38 @@ void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<in
         HalfEdge *he = f->halfEdge;
         do
         {
-            auto edgeKey = make_pair(std::min(he->head->id, he->pair->head->id),
+            verts.insert(he->head->id);
+            verts.insert(he->pair->head->id);
+
+            pair<int,int> edgeKey = make_pair(std::min(he->head->id, he->pair->head->id),
                                      std::max(he->head->id, he->pair->head->id));
             edgeCount[edgeKey]++;
             he = he->next;
         } while (he != f->halfEdge);
     }
 
-    // Step 2: Duplicate boundary vertices
+    for (int fid : faceIds)
+    {
+        Face *f = &m.faces[fid];
+        HalfEdge *he = f->halfEdge;
+        do
+        {
+            pair<int,int> edgeKey = make_pair(std::min(he->head->id, he->pair->head->id),
+                                     std::max(he->head->id, he->pair->head->id));
+            if (edgeCount[edgeKey] == 1) // Boundary edge. so we add this halfEdge to our boundary list, along with this face.
+            {
+                boundaryHes.push_back(he);
+                boundaryFaces.push_back(f);
+            }
+            he = he->next;
+        } while (he != f->halfEdge);
+    }
+
+    map<pair<int,int>, HalfEdge*> heMap; //for the new halfEdges created.
+    set<HalfEdge*> boundaryHeSet(boundaryHes.begin(), boundaryHes.end()); //for quick lookup.
+    set<pair<int,int>> edgesToDelete; //for the edges that we need to delete after the extrusion. (between boundary and inner faces.)
+
+    // Step 2: Duplicate boundary vertices, and create boundary halfEdges.
     for (const auto &entry : edgeCount)
     {
         if (entry.second == 1) // Boundary edge (appears once in selected faces)
@@ -798,6 +871,22 @@ void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<in
                 m.vertexPositions.push_back(m.vertexPositions[v1]);
                 duplicatedVertices[v1] = m.verts.size() - 1;
                 newVerts.push_back(m.verts.size() - 1);
+                int dup = m.verts.size() - 1;
+                // Create new half-edge
+                HalfEdge *h = &m.halfEdges.push_back(HalfEdge());
+                h->head = &m.verts[v1];
+                heMap[make_pair(dup, v1)] = h;
+                m.verts[dup].halfEdge = h;
+
+                HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
+                h2->head = &m.verts[dup];
+                heMap[make_pair(v1, dup)] = h2;
+                m.verts[v1].halfEdge = h2;
+
+                h->pair = h2; h2->pair = h;
+                verts.insert(dup); verts.erase(v1);
+
+                m.edges.push_back({std::min(dup,v1), std::max(dup, v1)});
             }
             if (duplicatedVertices.find(v2) == duplicatedVertices.end())
             {
@@ -805,54 +894,86 @@ void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<in
                 m.vertexPositions.push_back(m.vertexPositions[v2]);
                 duplicatedVertices[v2] = m.verts.size() - 1;
                 newVerts.push_back(m.verts.size() - 1);
+                int dup = m.verts.size() - 1;
+
+                HalfEdge *h = &m.halfEdges.push_back(HalfEdge());
+                h->head = &m.verts[v2];
+                heMap[make_pair(dup, v2)] = h;
+                m.verts[dup].halfEdge = h;
+
+                HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
+                h2->head = &m.verts[dup];
+                heMap[make_pair(v2, dup)] = h2;
+                m.verts[v2].halfEdge = h2;
+
+                h->pair = h2; h2->pair = h;
+                verts.insert(dup); verts.erase(v2); //v2 will remain at same position afterall.
+
+                m.edges.push_back({std::min(dup,v2), std::max(dup, v2)});
             }
         }
     }
-
-    // Step 3: Create side faces along the boundary
-    for (const auto &entry : edgeCount)
+    for(int i = 0; i < boundaryHes.size(); i++)
     {
-        if (entry.second == 1) // Only process boundary edges
+        HalfEdge *he = boundaryHes[i];
+        HalfEdge *ogPair = he->pair;
+        HalfEdge *ogNext = he->next;
+        // Face *f = boundaryFaces[i];
+        int v = he->head->id;
+        int back = he->pair->head->id;
+        int vDup = duplicatedVertices[v];
+        int backDup = duplicatedVertices[back];
+
+        // Create new half-edges and a quad face for the side
+        HalfEdge *h1 = &m.halfEdges.push_back(HalfEdge());
+        HalfEdge *h2 = heMap[make_pair(backDup, back)]; 
+        HalfEdge *h3 = &m.halfEdges.push_back(HalfEdge());
+        HalfEdge *h4 = heMap[make_pair(v, vDup)];
+
+        Face *newFace = &m.faces.push_back(Face(4)); //create a new face for this face.
+        newFace->halfEdge = h1;
+        m.edges.push_back({std::min(vDup, backDup), std::max(vDup, backDup)});
+
+        he->pair = h1; he->head = &m.verts[vDup];  
+        
+        // Connect half-edges to form a quad
+        h1->head = &m.verts[backDup]; h1->next = h2; h1->face = newFace; h1->pair = he;
+        
+        h2->head = &m.verts[back]; h2->next = h3; h2->face = newFace; //pair already set up for this during creation.
+
+        h3->head = &m.verts[v]; h3->next = h4; h3->face =newFace; h3->pair = ogPair;
+        ogPair->pair = h3;
+
+        h4->head = &m.verts[vDup]; h4->next = h1; h4->face = newFace; //pair already set up for this too.
+     
+        //after all this is done, we also should verify if the next and previous halfEdges are properly setup. 
+        //since the next halfEdge might not be in the boundary. We will fix it and its pair in that case.
+        if(boundaryHeSet.count(ogNext) == 0)
         {
-            int v1 = entry.first.first;
-            int v2 = entry.first.second;
-            int v1Dup = duplicatedVertices[v1];
-            int v2Dup = duplicatedVertices[v2];
-            
-            // Create new half-edges and a quad face for the side
-            HalfEdge *h1 = &m.halfEdges.push_back(HalfEdge());
-            HalfEdge *h2 = &m.halfEdges.push_back(HalfEdge());
-            HalfEdge *h3 = &m.halfEdges.push_back(HalfEdge());
-            HalfEdge *h4 = &m.halfEdges.push_back(HalfEdge());
-            
-            Face *newFace = &m.faces.push_back(Face());
-            newFace->halfEdge = h1;
-            
-            // Connect half-edges to form a quad
-            h1->head = &m.verts[v1Dup]; h1->next = h2; h1->face = newFace;
-            h2->head = &m.verts[v2Dup]; h2->next = h3; h2->face = newFace;
-            h3->head = &m.verts[v2]; h3->next = h4; h3->face = newFace;
-            h4->head = &m.verts[v1]; h4->next = h1; h4->face = newFace;
-            
-            // Set pairing relationships
-            h1->pair = h3; h3->pair = h1;
-            h2->pair = h4; h4->pair = h2;
+            //ogNext is not in the boundary. So we need to create a new edge here and delete a previous edge.
+            edgesToDelete.insert({std::min(ogNext->head->id, ogNext->pair->head->id), std::max(ogNext->head->id, ogNext->pair->head->id)});
+            if(duplicatedVertices.count(ogNext->head->id))
+            {
+                ogNext->head = &m.verts[duplicatedVertices[ogNext->head->id]]; //now it will point to the duplicated vertex.
+            }
+            ogNext->pair->head = &m.verts[vDup];
+            m.edges.push_back({std::min(ogNext->head->id, vDup), std::max(ogNext->head->id, vDup)});
         }
     }
-
+ 
+    vector<ivec2> newEdges;
+    for(int i = 0; i < m.edges.size(); i++)
+    {
+        if(edgesToDelete.count({m.edges[i].x, m.edges[i].y}) == 0)
+        {
+            newEdges.push_back(m.edges[i]);
+        }
+    }
+    m.edges = newEdges;
     // Step 4: Move duplicated boundary vertices
-    if (direction == vec3(0.0f))
+    for (int vid : verts) //verts contains the list of vertices we want to move.
     {
-        vec3 originpos = m.vertexPositions[newVerts[0]];
-        for (int i = 1; i < newVerts.size() - 1; i++)
-        {
-            direction += cross(m.vertexPositions[newVerts[i]] - originpos,
-                               m.vertexPositions[newVerts[i + 1]] - originpos);
-        }
-    }
-    direction = normalize(direction);
-    for (int vid : newVerts)
-    {
+        // cout << "moving by " << offset << " in direction " << direction.x << " " << direction.y << " " << direction.z << endl;
         m.vertexPositions[vid] += offset * direction;
     }
 }

@@ -105,7 +105,7 @@ int main() {
     // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
     sq.triangulateMesh(); // required for rendering
     // Mesh sq = loadOBJ("meshes/spot_control_mesh.obj");
-
+    catmullClarkSubdivision(sq);
     if(sq.normals.size() == 0)
         sq.recomputeVertexNormals();
     std::cout << "Mesh loaded" << std::endl;

@@ -647,123 +647,6 @@ void umbrellaSmooth(Mesh &m, float lambda, int iterations)
     }
 }
 
-void catmullClarkSubdivision(Mesh &m) {
-    std::vector<vec3> outVerts;
-    std::vector<std::vector<int>> outFaces;
-
-    std::unordered_map<Face*, vec3> facePoints;
-    std::unordered_map<HalfEdge*, vec3> edgePoints;
-    std::unordered_map<int, vec3> newVertexPositions;
-
-    // Step 1: Face points
-    for (int i = 0; i < m.faces.size(); ++i) {
-        Face &face = m.faces[i];
-        if (!face.halfEdge) continue;
-        vec3 fp(0.0f);
-        HalfEdge *start = face.halfEdge;
-        HalfEdge *he = start;
-        int count = 0;
-        do {
-            fp += m.vertexPositions[he->head->id];
-            he = he->next;
-            count++;
-        } while (he != start);
-        facePoints[&face] = fp / float(count);
-    }
-
-    // Step 2: Edge points
-    for (int i = 0; i < m.halfEdges.size(); ++i) {
-        HalfEdge &he = m.halfEdges[i];
-        if (edgePoints.count(&he)) continue; // Skip if already processed
-        vec3 p1 = m.vertexPositions[he.head->id];
-        vec3 p2 = m.vertexPositions[he.pair->head->id];
-        vec3 ep = p1 + p2;
-        if (he.face && he.pair->face) {
-            ep += facePoints[he.face] + facePoints[he.pair->face];
-            ep /= 4.0f;
-        } else {
-            ep /= 2.0f;
-        }
-        edgePoints[&he] = ep;
-        edgePoints[he.pair] = ep;
-    }
-
-    // Step 3: New vertex positions
-    for (int i = 0; i < m.verts.size(); ++i) {
-        Vertex &v = m.verts[i];
-        vec3 Q(0.0f);
-        vec3 R(0.0f);
-        vec3 P = m.vertexPositions[v.id];
-        auto neighbours = getVertexNeighbours(m, v.id);
-        int n = neighbours.size();
-        if (n == 0) { newVertexPositions[v.id] = P; continue; }
-
-        // Q = average of neighboring face points
-        HalfEdge *he = v.halfEdge;
-        do {
-            Q += facePoints[he->face];
-            he = prev(he)->pair;
-        } while (he && he != v.halfEdge);
-        Q /= float(n);
-
-        // R = average of midpoints of surrounding edges
-        for (int nb : neighbours) {
-            R += 0.5f * (P + m.vertexPositions[nb]);
-        }
-        R /= float(n);
-
-        newVertexPositions[v.id] = (Q + 2.0f * R + (float(n) - 3.0f) * P) / float(n);
-    }
-
-    // Step 4: Output
-    outVerts.clear();
-    outFaces.clear();
-
-    // Maps for bookkeeping
-    std::map<void*, int> facePointIds;
-    std::map<void*, int> edgePointIds;
-    std::map<int, int> oldVertexNewIds;
-
-    // Add face points
-    for (auto &pair : facePoints) {
-        facePointIds[pair.first] = outVerts.size();
-        outVerts.push_back(pair.second);
-    }
-
-    // Add edge points
-    for (auto &pair : edgePoints) {
-        if (edgePointIds.count(pair.first)) continue;
-        edgePointIds[pair.first] = outVerts.size();
-        edgePointIds[pair.first->pair] = edgePointIds[pair.first];
-        outVerts.push_back(pair.second);
-    }
-
-    // Add repositioned old verts
-    for (int i = 0; i < m.vertexPositions.size(); ++i) {
-        oldVertexNewIds[i] = outVerts.size();
-        outVerts.push_back(newVertexPositions[i]);
-    }
-
-    // Step 5: Build faces (anti-clockwise quads)
-    for (int i = 0; i < m.faces.size(); ++i) {
-        Face &face = m.faces[i];
-        HalfEdge *start = face.halfEdge;
-        HalfEdge *he = start;
-        do {
-            std::vector<int> quad;
-            quad.push_back(oldVertexNewIds[he->head->id]); // old vertex
-            quad.push_back(edgePointIds[he]);
-            quad.push_back(facePointIds[&face]);
-            quad.push_back(edgePointIds[prev(he)]);
-            if(prev(he)==nullptr) cout << "prev is null" << endl;
-            outFaces.push_back(quad);
-            he = he->next;
-        } while (he != start);
-    }
-    getMeshFromVerts(m, outVerts, outFaces);
-    std::cout << "Subdivision done: " << outVerts.size() << " vertices, " << outFaces.size() << " quads.\n";
-}
-
 void extrudeMultipleFaces(Mesh &m, float offset, vec3 direction, const vector<int> &faceIds)
 {
     set<int> selectedFaces(faceIds.begin(), faceIds.end());
@@ -957,5 +840,260 @@ void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
     {
         //update the position of all the vertices.
         m.vertexPositions[newVerts[i]] += offset * direction;
+    }
+}
+
+
+void catmullClarkSubdivision(Mesh& m) {
+    std::vector<vec3> outVerts;
+    std::vector<std::vector<int>> outFaces;        // Step 1: Compute face points (average of all vertices of the face)
+    std::vector<vec3> facePoints;
+    facePoints.reserve(m.faces.size());
+    
+    // Use indexing instead of range-based for loop
+    for (size_t i = 0; i < m.faces.size(); i++) {
+        const Face& face = m.faces[i];
+        vec3 facePoint(0, 0, 0);
+        int vertCount = 0;
+        
+        // Get the first half-edge of the face
+        HalfEdge* firstHalfEdge = face.halfEdge;
+        if (!firstHalfEdge) continue;
+        
+        // Traverse the face and add all vertex positions
+        HalfEdge* currentHalfEdge = firstHalfEdge;
+        do {
+            if (currentHalfEdge && currentHalfEdge->head) {
+                facePoint += m.vertexPositions[currentHalfEdge->head->id];
+                vertCount++;
+            }
+            currentHalfEdge = currentHalfEdge->next;
+        } while (currentHalfEdge && currentHalfEdge != firstHalfEdge);
+        
+        // Calculate the average
+        if (vertCount > 0) {
+            facePoint /= static_cast<float>(vertCount);
+        }
+        
+        facePoints.push_back(facePoint);
+    }
+    
+    // Step 2: Compute edge points (average of edge endpoints and adjacent face points)
+    std::map<std::pair<int, int>, int> edgePointIndices;
+    std::vector<vec3> edgePoints;
+    
+    // Use indexing instead of range-based for loop
+    for (size_t i = 0; i < m.halfEdges.size(); i++) {
+        const HalfEdge& edge = m.halfEdges[i];
+        if (!edge.head || !edge.pair || !edge.pair->head) continue;
+        
+        // Get the indices of the two vertices that form this edge
+        int v1 = edge.head->id;
+        int v2 = edge.pair->head->id;
+        
+        // Create a unique identifier for this edge (always have smaller index first)
+        std::pair<int, int> edgeKey = v1 < v2 ? std::make_pair(v1, v2) : std::make_pair(v2, v1);
+        
+        // Check if we've already processed this edge
+        if (edgePointIndices.find(edgeKey) != edgePointIndices.end()) continue;
+        
+        // Calculate edge midpoint
+        vec3 edgePoint = (m.vertexPositions[v1] + m.vertexPositions[v2]) * 0.5f;
+        
+        // Add the face points of the two adjacent faces
+        if (edge.face && edge.pair->face) {
+            // Find the index by pointer arithmetic
+            size_t faceIndex1 = 0;
+            size_t faceIndex2 = 0;
+            bool found1 = false, found2 = false;
+            
+            for (size_t j = 0; j < m.faces.size(); j++) {
+                if (&m.faces[j] == edge.face) {
+                    faceIndex1 = j;
+                    found1 = true;
+                }
+                if (&m.faces[j] == edge.pair->face) {
+                    faceIndex2 = j;
+                    found2 = true;
+                }
+                if (found1 && found2) break;
+            }
+            
+            if (found1 && found2 && 
+                faceIndex1 < facePoints.size() && 
+                faceIndex2 < facePoints.size()) {
+                edgePoint = (edgePoint + facePoints[faceIndex1] + facePoints[faceIndex2]) / 3.0f;
+            }
+        }
+        
+        // Store the edge point
+        edgePointIndices[edgeKey] = edgePoints.size();
+        edgePoints.push_back(edgePoint);
+    }
+    
+    // Step 3: Update original vertex positions
+    std::vector<vec3> updatedVertexPositions;
+    updatedVertexPositions.resize(m.vertexPositions.size());
+    
+    // Use indexing instead of range-based for loop
+    for (size_t i = 0; i < m.verts.size(); i++) {
+        const Vertex& vertex = m.verts[i];
+        if (vertex.id < 0 || vertex.id >= m.vertexPositions.size()) continue;
+        
+        // Get the original vertex position
+        vec3 originalPos = m.vertexPositions[vertex.id];
+        
+        // Collect all adjacent face points and edge midpoints
+        std::vector<vec3> adjacentFacePoints;
+        std::vector<vec3> adjacentEdgeMidpoints;
+        
+        // Get the first half-edge from this vertex
+        HalfEdge* firstHalfEdge = vertex.halfEdge;
+        if (!firstHalfEdge) {
+            updatedVertexPositions[vertex.id] = originalPos;
+            continue;
+        }
+        
+        // Traverse all edges around the vertex
+        HalfEdge* currentHalfEdge = firstHalfEdge;
+        do {
+            if (currentHalfEdge && currentHalfEdge->face) {
+                // Add the face point - find index by looping
+                size_t faceIndex = 0;
+                bool found = false;
+                
+                for (size_t j = 0; j < m.faces.size(); j++) {
+                    if (&m.faces[j] == currentHalfEdge->face) {
+                        faceIndex = j;
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found && faceIndex < facePoints.size()) {
+                    adjacentFacePoints.push_back(facePoints[faceIndex]);
+                }
+            }
+            
+            if (currentHalfEdge && currentHalfEdge->pair && currentHalfEdge->pair->head) {
+                // Add the edge midpoint
+                int v1 = vertex.id;
+                int v2 = currentHalfEdge->pair->head->id;
+                std::pair<int, int> edgeKey = v1 < v2 ? std::make_pair(v1, v2) : std::make_pair(v2, v1);
+                
+                auto it = edgePointIndices.find(edgeKey);
+                if (it != edgePointIndices.end() && it->second < edgePoints.size()) {
+                    adjacentEdgeMidpoints.push_back(edgePoints[it->second]);
+                } else {
+                    // If edge point isn't found, use the simple midpoint
+                    vec3 midpoint = (originalPos + m.vertexPositions[v2]) * 0.5f;
+                    adjacentEdgeMidpoints.push_back(midpoint);
+                }
+            }
+            
+            // Move to the next half-edge around the vertex
+            if (currentHalfEdge->pair) {
+                currentHalfEdge = currentHalfEdge->pair->next;
+            } else {
+                break;
+            }
+        } while (currentHalfEdge && currentHalfEdge != firstHalfEdge);
+        
+        // Calculate the number of adjacent faces/edges
+        int n = adjacentFacePoints.size();
+        
+        if (n > 0) {
+            // Calculate average of adjacent face points
+            vec3 F(0, 0, 0);
+            for (const auto& fp : adjacentFacePoints) {
+                F += fp;
+            }
+            F /= static_cast<float>(adjacentFacePoints.size());
+            
+            // Calculate average of adjacent edge midpoints
+            vec3 R(0, 0, 0);
+            for (const auto& em : adjacentEdgeMidpoints) {
+                R += em;
+            }
+            R /= static_cast<float>(adjacentEdgeMidpoints.size());
+            
+            // Apply Catmull-Clark formula for vertex update
+            // Updated position = (F + 2R + (n-3)P)/n where P is the original position
+            updatedVertexPositions[vertex.id] = (F + R * 2.0f + originalPos * static_cast<float>(n - 3)) / static_cast<float>(n);
+        } else {
+            updatedVertexPositions[vertex.id] = originalPos;
+        }
+    }
+    
+    // Step 4: Build the output vertex array
+    outVerts.clear();
+    
+    // First, add all the updated original vertices
+    for (const vec3& vp : updatedVertexPositions) {
+        outVerts.push_back(vp);
+    }
+    
+    // Then add all face points
+    int facePointBaseIndex = outVerts.size();
+    for (const vec3& fp : facePoints) {
+        outVerts.push_back(fp);
+    }
+    
+    // Finally add all edge points
+    int edgePointBaseIndex = outVerts.size();
+    for (const vec3& ep : edgePoints) {
+        outVerts.push_back(ep);
+    }
+    
+    // Step 5: Generate the new faces
+    outFaces.clear();
+    
+    for (size_t faceIdx = 0; faceIdx < m.faces.size(); faceIdx++) {
+        const Face& face = m.faces[faceIdx];
+        
+        // Skip invalid faces
+        if (!face.halfEdge) continue;
+        
+        // Store the half-edges of this face in order
+        std::vector<HalfEdge*> faceHalfEdges;
+        HalfEdge* firstHalfEdge = face.halfEdge;
+        HalfEdge* currentHalfEdge = firstHalfEdge;
+        
+        do {
+            faceHalfEdges.push_back(currentHalfEdge);
+            currentHalfEdge = currentHalfEdge->next;
+        } while (currentHalfEdge && currentHalfEdge != firstHalfEdge);
+        
+        int facePointIndex = facePointBaseIndex + faceIdx;
+        
+        // For each edge in the face, create a new quad
+        for (size_t i = 0; i < faceHalfEdges.size(); i++) {
+            HalfEdge* edge = faceHalfEdges[i];
+            if (!edge || !edge->head || !edge->next || !edge->next->head) continue;
+            
+            int v1 = edge->head->id;
+            int v2 = edge->next->head->id;
+            
+            // Find the edge point index
+            std::pair<int, int> edgeKey = v1 < v2 ? std::make_pair(v1, v2) : std::make_pair(v2, v1);
+            auto it = edgePointIndices.find(edgeKey);
+            if (it == edgePointIndices.end()) continue;
+            
+            int edgePoint1Index = edgePointBaseIndex + it->second;
+            
+            // Find the next edge's edge point
+            int v3 = v2;
+            int v4 = faceHalfEdges[(i + 1) % faceHalfEdges.size()]->next->head->id;
+            
+            edgeKey = v3 < v4 ? std::make_pair(v3, v4) : std::make_pair(v4, v3);
+            it = edgePointIndices.find(edgeKey);
+            if (it == edgePointIndices.end()) continue;
+            
+            int edgePoint2Index = edgePointBaseIndex + it->second;
+            
+            // Create the new quad face (v1, edgePoint1, facePoint, edgePoint2)
+            std::vector<int> newFace = {v1, edgePoint1Index, facePointIndex, edgePoint2Index};
+            outFaces.push_back(newFace);
+        }
     }
 }

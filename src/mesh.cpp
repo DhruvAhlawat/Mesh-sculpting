@@ -965,9 +965,13 @@ void extrude(Mesh &m, float offset, int faceid, vec3 direction, Face *f)
     }
 }
 
-void catmullClarkSubdivision(Mesh& m) {
+void catmullClarkSubdivision(Mesh& m, int iterations) {
+    if (iterations>1){
+        catmullClarkSubdivision(m, iterations-1);
+    }
     std::vector<vec3> outVerts;
     std::vector<std::vector<int>> outFaces;
+    outVerts.clear(); outFaces.clear();
     
     // Store original vertex positions
     const std::vector<vec3>& origVertPositions = m.vertexPositions;

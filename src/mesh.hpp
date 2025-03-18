@@ -180,4 +180,4 @@ void addNoise(Mesh &m, float threshold = 0.02);
 void extrude(Mesh &m, float offset, int faceid = -1, vec3 direction = vec3(0.0f), Face *f = nullptr);
 
 void extrudeMultipleFaces(Mesh &m, float offset, vector<int> faceIds, vec3 direction = vec3(0.0f));
-void catmullClarkSubdivision(Mesh &m);
+void catmullClarkSubdivision(Mesh &m, int iterations = 1);

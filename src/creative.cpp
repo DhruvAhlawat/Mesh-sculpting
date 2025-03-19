@@ -20,7 +20,7 @@ int main() {
     Mesh sq = generateSphere(20, 10);
 
     vector<int> topHandle = sq.nearestFacesToPoint(vec3(0,1,0), 40);
-    extrudeMultipleFaces(sq, 10, topHandle, vec3(0,1,0));
+    // extrudeMultipleFaces(sq, 10, topHandle, vec3(0,1,0));
 
 
     // Mesh sq = loadOBJ("meshes/cube.obj");
@@ -63,6 +63,7 @@ int main() {
         revolveAndExtrude(sq, f, 7.5, 0.4, 43, upward);
     }
 // 
+    catmullClarkSubdivision(sq, 1);
     sq.triangulateMesh(); // required for rendering
     if(sq.normals.size() == 0)
         sq.recomputeVertexNormals();

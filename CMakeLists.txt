@@ -12,4 +12,6 @@ target_include_directories(viewer PUBLIC deps/include)
 target_link_libraries(viewer glm::glm OpenGL::GL SDL2::SDL2)
 
 add_executable(example src/example.cpp)
+add_executable(creative src/creative.cpp)
 target_link_libraries(example viewer)
+target_link_libraries(creative viewer)

@@ -609,7 +609,7 @@ vector<int> getVertexNeighbours(Mesh &m, int vid)
     vector<int> neighbours;
     int maxiterations = 1e2; // assuming that a a normal vertex probably doesn't have more than 100 neighbours.
     int iter = 0;
-    cout << "   trying to find neighbours of " << vid << endl;
+    // cout << "   trying to find neighbours of " << vid << endl;
     HalfEdge *he = m.verts[vid].halfEdge;
     // cout << ""
     if(he == nullptr)
@@ -619,14 +619,13 @@ vector<int> getVertexNeighbours(Mesh &m, int vid)
     }
     do
     {
-        cout << he->head->id << " ";
         neighbours.push_back(he->head->id);
         he = he->pair->next;
         iter++;
         if(iter > maxiterations)
         {
             cout << "\n MAX ITERATIONS EXCEEDED IN FINDING NEIGHBOUR OF VERTEX: " << vid << endl;
-            throw "MAX ITERATIONS EXCEEDED IN FINDING NEIGHBOUR OF VERTEX";
+            throw "MAX ITERATIONS EXCEEDED IN FINDING NEIGHBOUR OF VERTEX"; //incase of an error.
         }
         // cout << "going to next" << endl;
     } while (he != nullptr && he != m.verts[vid].halfEdge);
@@ -1038,7 +1037,8 @@ void revolveAndExtrude(Mesh &m, int faceid, float theta, float offset, int itera
     //actually the face will remain the same.
     for(int iter = 0; iter < iterations; iter++)
     {
-        extrude(m, offset, faceid, dir + faceNormal(m, &m.faces[faceid]));
+        // extrude(m, offset, faceid, dir + faceNormal(m, &m.faces[faceid]));
+        extrudeMultipleFaces(m, offset, {faceid}, dir + faceNormal(m, &m.faces[faceid]));
         rotateFace(m, faceid, theta, vec3(0.0f, 1.0f, 0.0f));
     }
 }
@@ -1046,11 +1046,11 @@ void revolveAndExtrude(Mesh &m, int faceid, float theta, float offset, int itera
 
 void catmullClarkSubdivision(Mesh& m, int iterations) {
     if (iterations>1){
-        catmullClarkSubdivision(m, iterations-1);
-    }
+        catmullClarkSubdivision(m, iterations-1); //lmao nice recursion
+    } 
     std::vector<vec3> outVerts;
     std::vector<std::vector<int>> outFaces;
-    outVerts.clear(); outFaces.clear();
+    // outVerts.clear(); outFaces.clear(); // new vectors dont need clearing
     
     // Store original vertex positions
     const std::vector<vec3>& origVertPositions = m.vertexPositions;
@@ -1162,9 +1162,12 @@ void catmullClarkSubdivision(Mesh& m, int iterations) {
     // Step 3: Update original vertex positions
     std::vector<vec3> updatedVertPositions(origVertPositions.size());
     
-    for (size_t vertIdx = 0; vertIdx < m.verts.size(); vertIdx++) {
+    for (size_t vertIdx = 0; vertIdx < m.verts.size(); vertIdx++) 
+    {
         const Vertex& vert = m.verts[vertIdx];
-        if (vert.id < 0 || vert.id >= origVertPositions.size() || !vert.halfEdge) {
+        if (vert.id < 0 || vert.id >= origVertPositions.size() || !vert.halfEdge) 
+        {
+            cout << "vert id out of bounds" << vert.id << ", " << vertIdx << endl;
             if (vert.id >= 0 && vert.id < origVertPositions.size()) {
                 updatedVertPositions[vert.id] = origVertPositions[vert.id];
             }
@@ -1219,12 +1222,17 @@ void catmullClarkSubdivision(Mesh& m, int iterations) {
         
         // Calculate R (average of edge midpoints)
         vec3 R(0, 0, 0);
-        for (int adjVertId : adjacentVertices) {
+        vector<int> neighbours = getVertexNeighbours(m, vert.id);
+        for (int adjVertId : neighbours) {
             if (adjVertId >= 0 && adjVertId < origVertPositions.size()) {
-                R += (origVertPositions[vert.id] + origVertPositions[adjVertId]) * 0.5f;
+                R += (origVertPositions[vert.id] + origVertPositions[adjVertId])/2.0f;
+            }
+            else
+            {
+                cout << "TF OUT OF BOUND " << endl;
             }
         }
-        R /= static_cast<float>(adjacentVertices.size());
+        R /= static_cast<float>(neighbours.size());
         
         // Original position P
         const vec3& P = origVertPositions[vert.id];
@@ -1234,6 +1242,8 @@ void catmullClarkSubdivision(Mesh& m, int iterations) {
         
         // Apply Catmull-Clark formula: P' = (F + 2R + (n-3)P) / n
         updatedVertPositions[vert.id] = (F + 2.0f * R + static_cast<float>(n - 3) * P) / static_cast<float>(n);
+        // cout << "updated vertex position for " << vert.id << " from " << P.x << " " << P.y << " " << P.z << " to " << updatedVertPositions[vert.id].x << " " << updatedVertPositions[vert.id].y << " " << updatedVertPositions[vert.id].z << endl;
+        // updatedVertPositions[vert.id] = P;
     }
     
     // Step 4: Build the output vertex list

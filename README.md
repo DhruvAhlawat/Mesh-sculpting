@@ -1,4 +1,18 @@
-# COL781 Assignment 2: Mesh Processing
+# Mesh Scuptor software
+--- 
+can import any file in .OBJ format, and then allows to perform extrude/smoothen/subdivision/revolution operations. 
+
+
+## Creative Example
+
+![image](https://github.com/user-attachments/assets/d99ea62a-9199-4301-b594-d7c39beba785)
+Image of a render of a stylized spinning top mesh, created by extruding and revolving faces of a sphere multiple times. 
+
+![image](https://github.com/user-attachments/assets/2040299c-48e0-4077-8400-edbb53a0d5f5)
+Top view of same.
+
+
+# Running
 
 Make sure that [glm](https://github.com/g-truc/glm) and [SDL2](https://www.libsdl.org/) are installed. Ideally, these should be installed by your package manager rather than manually (at least, if you are on Linux or Mac).
 

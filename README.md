@@ -1,7 +1,7 @@
 # Mesh Scuptor software
 --- 
 can import any file in .OBJ format, and then allows to perform extrude/smoothen/subdivision/revolution operations. 
-
+More examples of meshes [here](a2_report.pdf)
 
 ## Creative Example
 
